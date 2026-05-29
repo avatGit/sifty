@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.spec
+
+# Claude Code — keep all Claude tooling files out of version control
+.claude/
+CLAUDE.md
+
+# Virtual environment
+.venv/
+venv/
+
+# Tests / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+Thumbs.db
+desktop.ini
