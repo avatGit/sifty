@@ -143,6 +143,16 @@ PathPicker {
     border: round $primary;
 }
 
+#picker-drives {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#picker-drives Button {
+    margin-right: 1;
+    min-width: 8;
+}
+
 #picker-tree {
     height: 1fr;
     background: $panel;

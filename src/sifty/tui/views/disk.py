@@ -105,8 +105,9 @@ class DiskView(BaseView):
     @work
     async def _browse(self) -> None:
         # Worker context required for push_screen_wait.
+        drives = [v.mountpoint for v in disk.volumes()]
         picked = await self.app.push_screen_wait(
-            PathPicker(self._path(), state.recent_paths())
+            PathPicker(self._path(), state.recent_paths(), drives=drives)
         )
         if picked is None:
             return

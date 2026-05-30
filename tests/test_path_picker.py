@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from textual.widgets import Input
+from textual.widgets import Button, Input
 
 from sifty.tui import state
 from sifty.tui.app import SiftyApp
@@ -38,6 +38,26 @@ async def test_path_picker_ok_returns_typed_path(tmp_path):
         await pilot.pause()
 
     assert result["path"] == (tmp_path / "sub")
+
+
+async def test_path_picker_drive_button_reroots(tmp_path):
+    drive_a = tmp_path / "a"
+    drive_b = tmp_path / "b"
+    drive_a.mkdir()
+    drive_b.mkdir()
+    async with SiftyApp(start_workers=False).run_test(size=(120, 40)) as pilot:
+        async def grab():
+            await pilot.app.push_screen_wait(
+                PathPicker(drive_a, [], drives=[str(drive_a), str(drive_b)])
+            )
+
+        pilot.app.run_worker(grab())
+        await pilot.pause()
+        screen = pilot.app.screen
+        assert screen.query_one("#drive-1", Button)  # a button per drive
+        screen._set_root(str(drive_b))  # what clicking a drive button does
+        await pilot.pause()
+        assert screen.query_one("#picker-path", Input).value == str(drive_b)
 
 
 async def test_path_picker_cancel_returns_none(tmp_path):
