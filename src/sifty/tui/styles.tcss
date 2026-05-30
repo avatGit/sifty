@@ -120,6 +120,35 @@ Tree {
     margin-top: 1;
 }
 
+/* ---- Path picker modal ---- */
+PathPicker {
+    align: center middle;
+}
+
+#picker-box {
+    width: 84;
+    height: 30;
+    padding: 1 2;
+    background: $surface;
+    border: round $primary;
+}
+
+#picker-tree {
+    height: 1fr;
+    background: $panel;
+    margin-top: 1;
+}
+
+#picker-buttons {
+    height: auto;
+    align-horizontal: right;
+    margin-top: 1;
+}
+
+#picker-buttons Button {
+    margin-left: 2;
+}
+
 /* ---- Confirm modal ---- */
 ConfirmModal {
     align: center middle;

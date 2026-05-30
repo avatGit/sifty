@@ -12,6 +12,8 @@ from textual.widgets import Button, Input, Static, Tree
 
 from ...core import disk
 from ...console import human_size
+from .. import state
+from ..screens.path_picker import PathPicker
 from ..widgets import Panel
 from .base import BaseView
 
@@ -23,6 +25,7 @@ class DiskView(BaseView):
         yield Static("Disk analysis", classes="title")
         with Horizontal(classes="row"):
             yield Input(value=str(Path.home()), id="disk-path", placeholder="Folder to analyze")
+            yield Button("Browse…", id="browse")
             yield Button("Analyze", id="analyze", variant="primary")
             yield Button("Find duplicates", id="dupes")
         yield Panel(Tree("…", id="biggest-tree"), title="Biggest items")
@@ -75,10 +78,25 @@ class DiskView(BaseView):
             f"{len(groups)} duplicate groups · {human_size(wasted)} reclaimable by de-duping",
         )
 
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "analyze":
             self._status("Analyzing…")
             self.analyze()
         elif event.button.id == "dupes":
             self._status("Hashing files… (this can take a while)")
             self.find_dupes()
+        elif event.button.id == "browse":
+            self._browse()  # launches the worker below
+
+    @work
+    async def _browse(self) -> None:
+        # Worker context required for push_screen_wait.
+        picked = await self.app.push_screen_wait(
+            PathPicker(self._path(), state.recent_paths())
+        )
+        if picked is None:
+            return
+        self.query_one("#disk-path", Input).value = str(picked)
+        state.add_recent_path(str(picked))
+        self._status("Analyzing…")
+        self.analyze()
