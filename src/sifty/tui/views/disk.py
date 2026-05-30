@@ -23,8 +23,8 @@ logger = logging.getLogger("sifty.tui")
 class DiskView(BaseView):
     def compose(self) -> ComposeResult:
         yield Static("Disk analysis", classes="title")
-        with Horizontal(classes="row"):
-            yield Input(value=str(Path.home()), id="disk-path", placeholder="Folder to analyze")
+        yield Input(value=str(Path.home()), id="disk-path", placeholder="Folder to analyze")
+        with Horizontal(classes="actions"):
             yield Button("Browse…", id="browse")
             yield Button("Analyze", id="analyze", variant="primary")
             yield Button("Find duplicates", id="dupes")
@@ -59,8 +59,8 @@ class DiskView(BaseView):
         tree.root.set_label(str(path))
         tree.root.expand()
         for entry, size in items:
-            icon = "📁" if entry.is_dir() else "📄"
-            tree.root.add_leaf(f"{icon} {entry.name}  —  {human_size(size)}")
+            suffix = "\\" if entry.is_dir() else ""
+            tree.root.add_leaf(f"{entry.name}{suffix}  —  {human_size(size)}")
         self._status(f"Top {len(items)} items in {path}")
 
     @work(thread=True, exclusive=True, group="disk")

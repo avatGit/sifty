@@ -136,12 +136,18 @@ async def test_apps_row_click_toggles_mark():
         assert {a.name for a in view._apps_for_action()} == {"Beta"}
 
 
-async def test_disk_view_has_browse_button():
-    async with _make_app().run_test() as pilot:
+async def test_disk_view_buttons_are_on_screen():
+    from textual.widgets import Button
+
+    async with _make_app().run_test(size=(120, 40)) as pilot:
         await pilot.app.show("disk")
         await pilot.pause()
-        from textual.widgets import Button
-        assert pilot.app.query_one("#browse", Button) is not None
+        width = pilot.app.size.width
+        for sel in ("#browse", "#analyze", "#dupes"):
+            btn = pilot.app.screen.query_one(sel, Button)
+            region = btn.region
+            assert region.width > 0
+            assert region.right <= width  # not pushed off the right edge
 
 
 async def test_updates_view_populates_table():
