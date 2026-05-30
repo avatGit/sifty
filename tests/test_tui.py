@@ -13,11 +13,20 @@ from textual.widgets import DataTable, Input, SelectionList, Static, Tree
 
 from sifty.core.apps import InstalledApp
 from sifty.core.junk import CategoryScan, JunkCategory
+from sifty.core.models import Run
 from sifty.core.updates import Upgrade
 from sifty.tui.app import SECTIONS, SiftyApp
 from sifty.tui.commands import SiftyCommands, _entries
 from sifty.tui.modals import ConfirmModal
-from sifty.tui.views import AppsView, DiskView, HomeView, JunkView, UpdatesView, VIEWS
+from sifty.tui.views import (
+    AppsView,
+    DiskView,
+    HomeView,
+    JunkView,
+    ReportsView,
+    UpdatesView,
+    VIEWS,
+)
 
 
 def _make_app() -> SiftyApp:
@@ -134,6 +143,21 @@ async def test_apps_row_click_toggles_mark():
         view._toggle_mark("Beta")
         view._toggle_mark("Alpha")  # toggling off
         assert {a.name for a in view._apps_for_action()} == {"Beta"}
+
+
+async def test_reports_view_populates():
+    runs = [Run(1, "2026-01-01T00:00:00+00:00", "junk", "user-temp", 600, 3, True, 3)]
+    summ = {"runs": 1, "bytes_freed": 600, "items": 3}
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("reports")
+        await pilot.pause()
+        view = pilot.app.query_one(ReportsView)
+        view._populate(runs, summ)
+        await pilot.pause()
+        table = pilot.app.query_one("#runs-table", DataTable)
+        assert table.row_count == 1
+        summary = pilot.app.query_one("#reports-summary", Static)
+        assert "reclaimed" in str(summary.render())
 
 
 async def test_disk_view_buttons_are_on_screen():
