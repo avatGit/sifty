@@ -94,6 +94,23 @@ DataTable {
     background: $panel;
 }
 
+/* Keep the cleanup results area from collapsing to a sliver when empty. */
+#cleanup-table {
+    min-height: 8;
+}
+
+/* Home quick-access grid of screen buttons. */
+#home-nav {
+    grid-size: 3;
+    grid-gutter: 1 2;
+    grid-rows: 3;
+    height: auto;
+}
+
+#home-nav Button {
+    width: 100%;
+}
+
 SelectionList {
     height: auto;
     max-height: 14;

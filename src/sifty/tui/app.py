@@ -43,9 +43,9 @@ SIFTY_THEME = Theme(
 # render them as tofu boxes; Windows Terminal users still get a clean look.
 SECTIONS: list[tuple[str, str]] = [
     ("home", "Home"),
+    ("cleanup", "Cleanup"),
     ("junk", "Junk"),
     ("disk", "Disk"),
-    ("cleanup", "Cleanup"),
     ("apps", "Apps"),
     ("startup", "Startup"),
     ("services", "Services"),

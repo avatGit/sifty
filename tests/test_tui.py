@@ -53,6 +53,19 @@ def test_command_palette_entries_cover_sections_and_admin():
     assert len(entries) == len(SECTIONS) + 1
 
 
+async def test_home_has_quick_access_buttons():
+    from textual.widgets import Button
+
+    async with _make_app().run_test() as pilot:
+        await pilot.pause()
+        buttons = pilot.app.screen.query("#home-nav Button")
+        assert len(buttons) == len(SECTIONS) - 1  # one per screen, minus Home
+        await pilot.app.show("home")
+        # Each quick-access button maps to a real section.
+        ids = {b.id for b in buttons}
+        assert "go-cleanup" in ids and "go-ai" in ids
+
+
 async def test_command_palette_registered():
     async with _make_app().run_test() as pilot:
         assert SiftyCommands in type(pilot.app).COMMANDS

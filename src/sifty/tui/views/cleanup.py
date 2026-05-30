@@ -13,6 +13,7 @@ from textual.widgets import Button, DataTable, Input, Static
 from ...console import human_size
 from ...core import cleanup, disk, history
 from ..modals import ConfirmModal
+from ..widgets import Panel
 from .base import BaseView
 
 logger = logging.getLogger("sifty.tui")
@@ -36,7 +37,7 @@ class CleanupView(BaseView):
             yield Button("Duplicates", id="mode-duplicates", variant="primary")
             yield Button("Large files", id="mode-large")
             yield Button("Stale downloads", id="mode-stale")
-        yield DataTable(id="cleanup-table")
+        yield Panel(DataTable(id="cleanup-table"), title="Results")
         with Horizontal(classes="actions"):
             yield Button("Clear marks", id="clear-marks")
             yield Button("Clean selected", id="clean", variant="warning")

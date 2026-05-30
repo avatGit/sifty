@@ -7,6 +7,7 @@ import logging
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
+from textual.containers import Grid
 from textual.widgets import Button, Label, Static
 
 from ...core import disk, junk
@@ -20,9 +21,17 @@ logger = logging.getLogger("sifty.tui")
 
 class HomeView(BaseView):
     def compose(self) -> ComposeResult:
+        from ..app import SECTIONS  # lazy import avoids an app<->view cycle
+
         yield Static("Overview", classes="title")
         yield Panel(Static("Reading volumes…", id="vol-body"), title="Volumes")
         yield Panel(Label("Reclaimable junk: …", id="junk-total"), title="Junk")
+        with Panel(title="Jump to"):
+            with Grid(id="home-nav"):
+                for key, label in SECTIONS:
+                    if key == "home":
+                        continue
+                    yield Button(label, id=f"go-{key}")
         if not is_admin():
             with Panel(title="Administrator"):
                 yield Static(
@@ -42,9 +51,12 @@ class HomeView(BaseView):
         if self.workers_enabled():
             self.compute_junk_total()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "elevate":
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id or ""
+        if bid == "elevate":
             self.app.action_elevate()
+        elif bid.startswith("go-"):
+            await self.app.show(bid.removeprefix("go-"))
 
     def _render_volumes(self) -> None:
         text = Text()
