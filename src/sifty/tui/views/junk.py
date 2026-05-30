@@ -109,8 +109,10 @@ class JunkView(BaseView):
 
     @work(thread=True, exclusive=True)
     def apply_clean(self, keys: set[str]) -> None:
-        freed, items, skipped = junk.clean(only=keys, dry_run=False)
-        self.app.call_from_thread(self._after_clean, freed, items, len(skipped))
+        result = junk.clean(only=keys, dry_run=False)
+        self.app.call_from_thread(
+            self._after_clean, result.bytes_freed, result.items, len(result.skipped)
+        )
 
     def _after_clean(self, freed: int, items: int, skipped: int) -> None:
         self.app.notify(

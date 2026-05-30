@@ -12,10 +12,10 @@ import os
 from pathlib import Path
 
 from ..infra.config import load_config
-from .models import CategoryScan, JunkCategory
+from .models import CategoryScan, CleanResult, JunkCategory
 from .safety import ProtectedPathError, trash
 
-__all__ = ["JunkCategory", "CategoryScan", "junk_categories", "scan", "clean"]
+__all__ = ["JunkCategory", "CategoryScan", "CleanResult", "junk_categories", "scan", "clean"]
 
 
 def _env_path(name: str) -> Path | None:
@@ -132,16 +132,18 @@ def clean(
     only: set[str] | None = None,
     *,
     dry_run: bool = True,
-) -> tuple[int, int, list[str]]:
+) -> CleanResult:
     """Trash the contents of selected junk categories.
 
-    Returns ``(bytes_freed, items_removed, skipped_messages)``.
+    Returns a :class:`CleanResult`. ``trashed`` holds the original paths sent to
+    the Recycle Bin (empty on a dry-run) — used to record an undoable session.
     """
     config = config or load_config()
     extra_protected = config.section("safety").get("extra_protected_paths", [])
     bytes_freed = 0
     items = 0
     skipped: list[str] = []
+    trashed: list[Path] = []
 
     for cat_scan in scan(config, only):
         cat = cat_scan.category
@@ -170,9 +172,11 @@ def clean(
                     )
                     bytes_freed += size
                     items += 1
+                    if not dry_run:
+                        trashed.append(entry)
                 except ProtectedPathError as exc:
                     skipped.append(str(exc))
                 except OSError as exc:
                     skipped.append(f"{entry}: {exc}")
 
-    return bytes_freed, items, skipped
+    return CleanResult(bytes_freed, items, skipped, trashed)

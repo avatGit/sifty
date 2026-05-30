@@ -70,3 +70,23 @@ class Upgrade:
 class Move:
     src: Path
     dest: Path
+
+
+@dataclass
+class CleanResult:
+    bytes_freed: int
+    items: int
+    skipped: list[str]
+    trashed: list[Path]  # original paths sent to the Recycle Bin (apply only)
+
+
+@dataclass
+class Run:
+    id: int
+    ts: str           # ISO timestamp (UTC)
+    action: str       # e.g. "junk"
+    detail: str       # e.g. category keys
+    bytes_freed: int
+    items: int
+    success: bool
+    restorable: int   # count of trashed items not yet restored

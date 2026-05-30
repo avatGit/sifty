@@ -39,9 +39,10 @@ def test_scan_reports_user_temp_size(sandbox_temp):
 
 def test_clean_dry_run_does_not_delete(monkeypatch, sandbox_temp):
     monkeypatch.setattr(safety, "send_to_trash", lambda p: pytest.fail("must not delete in dry-run"))
-    freed, items, skipped = junk.clean(only={"user-temp"}, dry_run=True)
-    assert freed == 600
-    assert items == 3  # three top-level entries: a.tmp, b.log, cache/
+    result = junk.clean(only={"user-temp"}, dry_run=True)
+    assert result.bytes_freed == 600
+    assert result.items == 3  # three top-level entries: a.tmp, b.log, cache/
+    assert result.trashed == []  # dry-run trashes nothing
     assert sandbox_temp.exists()
 
 
@@ -49,10 +50,11 @@ def test_clean_apply_trashes_entries(monkeypatch, sandbox_temp):
     trashed = []
     monkeypatch.setattr(safety, "send_to_trash", lambda p: trashed.append(p))
     monkeypatch.setattr(safety, "audit", lambda msg: None)
-    freed, items, skipped = junk.clean(only={"user-temp"}, dry_run=False)
-    assert items == 3
+    result = junk.clean(only={"user-temp"}, dry_run=False)
+    assert result.items == 3
     assert len(trashed) == 3
-    assert not skipped
+    assert len(result.trashed) == 3  # surfaced for the undo manifest
+    assert not result.skipped
 
 
 def test_downloads_installers_gated_by_config(monkeypatch, tmp_path):

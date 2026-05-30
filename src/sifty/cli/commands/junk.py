@@ -58,24 +58,24 @@ def clean_cmd(
     """Move junk to the Recycle Bin. Dry-run unless --apply is given."""
     only = set(category) if category else None
 
-    preview_bytes, preview_items, _ = junk.clean(only=only, dry_run=True)
-    if preview_items == 0:
+    preview = junk.clean(only=only, dry_run=True)
+    if preview.items == 0:
         success("Nothing to clean — you're already tidy.")
         return
 
     console.print(
-        f"Found [bold]{preview_items:,}[/bold] items totalling "
-        f"[bold]{human_size(preview_bytes)}[/bold]."
+        f"Found [bold]{preview.items:,}[/bold] items totalling "
+        f"[bold]{human_size(preview.bytes_freed)}[/bold]."
     )
     if not apply:
         console.print("[dim]Dry-run — nothing was deleted. Re-run with --apply to remove.[/dim]")
         return
 
-    if not confirm(f"Move {preview_items:,} items ({human_size(preview_bytes)}) to the Recycle Bin?", assume_yes=yes):
+    if not confirm(f"Move {preview.items:,} items ({human_size(preview.bytes_freed)}) to the Recycle Bin?", assume_yes=yes):
         warn("Cancelled.")
         return
 
-    freed, items, skipped = junk.clean(only=only, dry_run=False)
-    success(f"Sent {items:,} items ({human_size(freed)}) to the Recycle Bin.")
-    if skipped:
-        warn(f"{len(skipped)} item(s) skipped (in use or protected).")
+    result = junk.clean(only=only, dry_run=False)
+    success(f"Sent {result.items:,} items ({human_size(result.bytes_freed)}) to the Recycle Bin.")
+    if result.skipped:
+        warn(f"{len(result.skipped)} item(s) skipped (in use or protected).")
