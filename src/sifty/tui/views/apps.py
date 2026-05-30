@@ -27,8 +27,8 @@ class AppsView(BaseView):
     def compose(self) -> ComposeResult:
         yield Static("Installed apps", classes="title")
         yield Static(
-            "Type to filter · click a header to sort · Space to mark · "
-            "Uninstall acts on marked rows (or the highlighted one).",
+            "Type to filter · click a header to sort · click a row or press Space "
+            "to mark · Uninstall acts on marked rows (or the highlighted one).",
             classes="subtle",
         )
         yield Input(placeholder="Filter by name or publisher…", id="apps-filter")
@@ -119,19 +119,26 @@ class AppsView(BaseView):
         app_obj = self._highlighted_app()
         return [app_obj] if app_obj else []
 
-    def action_toggle_mark(self) -> None:
-        app_obj = self._highlighted_app()
-        if not app_obj:
-            return
+    def _toggle_mark(self, name: str) -> None:
         table = self.query_one("#apps-table", DataTable)
-        if app_obj.name in self._marked:
-            self._marked.discard(app_obj.name)
-            table.update_cell(app_obj.name, self._cols[0], _UNMARK)
+        if name in self._marked:
+            self._marked.discard(name)
+            table.update_cell(name, self._cols[0], _UNMARK)
         else:
-            self._marked.add(app_obj.name)
-            table.update_cell(app_obj.name, self._cols[0], _MARK)
+            self._marked.add(name)
+            table.update_cell(name, self._cols[0], _MARK)
         marked = len(self._marked)
         self._status(f"{len(self._filtered)} of {len(self._apps)} apps · {marked} marked")
+
+    def action_toggle_mark(self) -> None:
+        app_obj = self._highlighted_app()
+        if app_obj:
+            self._toggle_mark(app_obj.name)
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Clicking (or Enter on) a row toggles its mark — easy multi-select."""
+        if event.row_key is not None and event.row_key.value is not None:
+            self._toggle_mark(event.row_key.value)
 
     # ----------------------------------------------------------------- events
     def on_input_changed(self, event: Input.Changed) -> None:

@@ -119,6 +119,31 @@ async def test_apps_filter_narrows_and_marking_selects():
         assert {a.name for a in view._apps_for_action()} == {"Alpha"}
 
 
+async def test_apps_row_click_toggles_mark():
+    apps = [
+        InstalledApp("Alpha", "1", "Pub", 10, "", "HKCU"),
+        InstalledApp("Beta", "1", "Pub", 20, "", "HKCU"),
+    ]
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("apps")
+        await pilot.pause()
+        view = pilot.app.query_one(AppsView)
+        view._populate(apps)
+        await pilot.pause()
+        view._toggle_mark("Alpha")
+        view._toggle_mark("Beta")
+        view._toggle_mark("Alpha")  # toggling off
+        assert {a.name for a in view._apps_for_action()} == {"Beta"}
+
+
+async def test_disk_view_has_browse_button():
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("disk")
+        await pilot.pause()
+        from textual.widgets import Button
+        assert pilot.app.query_one("#browse", Button) is not None
+
+
 async def test_updates_view_populates_table():
     ups = [Upgrade("Firefox", "Mozilla.Firefox", "120.0", "121.0")]
     async with _make_app().run_test() as pilot:
