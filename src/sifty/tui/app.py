@@ -107,4 +107,11 @@ class SiftyApp(App):
 
 def run() -> None:
     """Entry point used by the ``sifty tui`` command."""
-    SiftyApp().run()
+    from ..logsetup import get_logger, setup_logging
+
+    setup_logging()
+    try:
+        SiftyApp().run()
+    except Exception:
+        get_logger("sifty.tui").exception("TUI crashed")
+        raise

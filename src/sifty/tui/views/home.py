@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
@@ -12,6 +14,8 @@ from ...commands import disk, junk
 from ...console import human_size
 from ..widgets import Panel, usage_gauge
 from .base import BaseView
+
+logger = logging.getLogger("sifty.tui")
 
 
 class HomeView(BaseView):
@@ -60,6 +64,7 @@ class HomeView(BaseView):
         try:
             total = sum(cat.size for cat in junk.scan())
         except Exception:
+            logger.exception("Home: junk total scan failed")
             return
         self.app.call_from_thread(self._set_junk_total, total)
 

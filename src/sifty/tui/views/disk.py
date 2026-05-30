@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from textual import work
@@ -13,6 +14,8 @@ from ...commands import disk
 from ...console import human_size
 from ..widgets import Panel
 from .base import BaseView
+
+logger = logging.getLogger("sifty.tui")
 
 
 class DiskView(BaseView):
@@ -42,6 +45,7 @@ class DiskView(BaseView):
         try:
             items = disk.biggest(path, 20)
         except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Disk analyze failed for %s", path)
             self.app.call_from_thread(self._status, f"Failed: {exc}")
             return
         self.app.call_from_thread(self._show_biggest, path, items)
@@ -63,6 +67,7 @@ class DiskView(BaseView):
             groups = disk.find_duplicates(path, 1024)
             wasted = sum(disk._entry_size(ps[0]) * (len(ps) - 1) for ps in groups.values())
         except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Duplicate scan failed for %s", path)
             self.app.call_from_thread(self._status, f"Failed: {exc}")
             return
         self.app.call_from_thread(

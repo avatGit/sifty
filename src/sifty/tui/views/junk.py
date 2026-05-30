@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -13,6 +15,8 @@ from ...commands import junk
 from ...console import human_size
 from ..modals import ConfirmModal
 from .base import BaseView
+
+logger = logging.getLogger("sifty.tui")
 
 
 class JunkView(BaseView):
@@ -38,6 +42,7 @@ class JunkView(BaseView):
         try:
             cats = junk.scan()
         except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Junk scan failed")
             self.app.call_from_thread(self._set_status, f"Scan failed: {exc}")
             return
         self.app.call_from_thread(self._populate, cats)

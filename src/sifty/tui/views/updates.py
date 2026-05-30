@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -10,6 +12,8 @@ from textual.widgets import Button, DataTable, Static
 from ...commands import updates as updates_mod
 from ..modals import ConfirmModal
 from .base import BaseView
+
+logger = logging.getLogger("sifty.tui")
 
 
 class UpdatesView(BaseView):
@@ -36,6 +40,7 @@ class UpdatesView(BaseView):
         try:
             ups = updates_mod.list_upgrades()
         except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Update check failed")
             self.app.call_from_thread(self._status, f"Failed: {exc}")
             return
         self.app.call_from_thread(self._populate, ups)

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from textual import work
 from textual.app import ComposeResult
 from textual.widgets import Input, RichLog, Static
 
 from ...ai.client import OllamaClient
 from .base import BaseView
+
+logger = logging.getLogger("sifty.tui")
 
 _SYSTEM = "You are a careful Windows maintenance assistant. Be concise and cautious."
 
@@ -60,6 +64,7 @@ class AIView(BaseView):
         try:
             answer = self._client.chat(_SYSTEM, question)
         except Exception as exc:
+            logger.exception("AI chat failed")
             answer = f"(error talking to Ollama: {exc})"
         self.app.call_from_thread(self._reply, answer)
 

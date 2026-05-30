@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -11,6 +13,8 @@ from ...commands import apps as apps_mod
 from ...console import human_size
 from ..modals import ConfirmModal
 from .base import BaseView
+
+logger = logging.getLogger("sifty.tui")
 
 
 class AppsView(BaseView):
@@ -36,6 +40,7 @@ class AppsView(BaseView):
         try:
             apps = sorted(apps_mod.installed_apps(), key=lambda a: a.size_bytes, reverse=True)
         except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Apps enumeration failed")
             self.app.call_from_thread(self._status, f"Failed: {exc}")
             return
         self.app.call_from_thread(self._populate, apps)
