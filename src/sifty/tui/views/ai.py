@@ -1,26 +1,40 @@
-"""AI screen: a chat panel backed by the local Ollama advisor."""
+"""AI screen: a chat panel backed by the local Ollama advisor.
+
+The transcript is a scrollable column of message widgets (not a RichLog), so
+the *streaming* reply can be rendered into a message that lives inside the chat
+box and updated in place as tokens arrive — instead of spilling into a separate
+area outside the box until it completes.
+
+The model answers in Markdown, so replies are rendered through Rich's
+:class:`~rich.markdown.Markdown` — headings, bold/italic, code fences and
+tables show up formatted instead of as literal ``**asterisks**`` and backticks.
+"""
 
 from __future__ import annotations
 
 import logging
 
+from rich.markdown import Markdown
+from rich.markup import escape
 from textual import work
 from textual.app import ComposeResult
-from textual.widgets import Input, RichLog, Static
+from textual.containers import VerticalScroll
+from textual.widgets import Input, Static
 
-from ...ai.client import OllamaClient
+from ...ai.advisor import SYSTEM_PROMPT
+from ...ai.client import OllamaClient, OllamaUnavailable
 from .base import BaseView
 
 logger = logging.getLogger("sifty.tui")
 
-_SYSTEM = "You are a careful Windows maintenance assistant. Be concise and cautious."
+_SYSTEM = SYSTEM_PROMPT
 
 
 class AIView(BaseView):
     def compose(self) -> ComposeResult:
         yield Static("Ask Sifty", classes="title")
         yield Static("Checking Ollama…", id="ai-status", classes="subtle")
-        yield RichLog(id="chat-log", wrap=True, markup=True)
+        yield VerticalScroll(id="chat-log")
         yield Input(
             placeholder="Ask about cleanup, disk usage, safety…  (Enter to send)",
             id="ask",
@@ -28,6 +42,7 @@ class AIView(BaseView):
 
     def on_mount(self) -> None:
         self._client = OllamaClient.from_config()
+        self._live: Static | None = None  # the in-progress Sifty reply widget
         if self.workers_enabled():
             self.check_status()
 
@@ -50,27 +65,50 @@ class AIView(BaseView):
         question = event.value.strip()
         if not question:
             return
-        log = self.query_one("#chat-log", RichLog)
-        log.write(f"[b cyan]You[/b cyan]  {question}")
+        log = self.query_one("#chat-log", VerticalScroll)
         self.query_one("#ask", Input).value = ""
-        log.write("[dim]Sifty is thinking…[/dim]")
+        await log.mount(Static(f"[b cyan]You[/b cyan]  {escape(question)}", classes="msg"))
+        await log.mount(Static("[b green]Sifty[/b green]", classes="msg-label"))
+        self._live = Static("[dim]thinking…[/dim]", classes="msg")
+        await log.mount(self._live)
+        log.scroll_end(animate=False)
         self.ask(question)
 
     @work(thread=True, exclusive=True, group="ai-chat")
     def ask(self, question: str) -> None:
         if not self._client.is_available():
-            self.app.call_from_thread(self._reply, None)
+            self.app.call_from_thread(self._finish, None, None)
             return
+        parts: list[str] = []
         try:
-            answer = self._client.chat(_SYSTEM, question)
-        except Exception as exc:
+            for chunk in self._client.chat_stream(_SYSTEM, question):
+                parts.append(chunk)
+                self.app.call_from_thread(self._stream, "".join(parts))
+        except OllamaUnavailable as exc:
+            self.app.call_from_thread(self._finish, None, str(exc))
+            return
+        except Exception as exc:  # never let a worker die silently
             logger.exception("AI chat failed")
-            answer = f"(error talking to Ollama: {exc})"
-        self.app.call_from_thread(self._reply, answer)
+            self.app.call_from_thread(self._finish, None, str(exc))
+            return
+        self.app.call_from_thread(self._finish, "".join(parts).strip(), None)
 
-    def _reply(self, answer: str | None) -> None:
-        log = self.query_one("#chat-log", RichLog)
-        if answer is None:
-            log.write("[yellow]AI unavailable — is Ollama running?[/yellow]\n")
+    def _stream(self, text: str) -> None:
+        """Render the in-progress answer (as Markdown) while tokens arrive."""
+        if self._live is None:
+            return
+        self._live.update(Markdown(text))
+        self.query_one("#chat-log", VerticalScroll).scroll_end(animate=False)
+
+    def _finish(self, answer: str | None, err: str | None) -> None:
+        """Replace the in-progress reply with the completed answer or an error."""
+        if self._live is None:
+            return
+        if err is not None:
+            self._live.update(f"[yellow](error talking to Ollama: {escape(err)})[/yellow]")
+        elif not answer:
+            self._live.update("[yellow]AI unavailable — is Ollama running?[/yellow]")
         else:
-            log.write(f"[b green]Sifty[/b green]  {answer}\n")
+            self._live.update(Markdown(answer))
+        self._live = None
+        self.query_one("#chat-log", VerticalScroll).scroll_end(animate=False)

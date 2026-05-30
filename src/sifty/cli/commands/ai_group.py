@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from rich.markdown import Markdown
 
-from ...ai.advisor import summarize_disk
+from ...ai.advisor import SYSTEM_PROMPT, summarize_disk
 from ...ai.client import OllamaClient
 from ...console import console, error, human_size, success, warn
 from ...core import disk
@@ -51,9 +52,11 @@ def ask_cmd(
             answer = summarize_disk(client, items, question)
     else:
         with console.status("Thinking…"):
-            answer = client.chat(
-                "You are a careful Windows maintenance assistant. Be concise and cautious.",
-                question,
-            )
+            answer = client.chat(SYSTEM_PROMPT, question)
 
-    console.print(answer or "[yellow]No answer (AI unavailable).[/yellow]")
+    if answer:
+        # The model replies in Markdown; render it so headings, code fences
+        # and tables show up formatted instead of as literal syntax.
+        console.print(Markdown(answer))
+    else:
+        console.print("[yellow]No answer (AI unavailable).[/yellow]")

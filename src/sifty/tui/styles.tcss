@@ -116,6 +116,16 @@ Tree {
     padding: 0 1;
 }
 
+/* Chat messages live inside the scrollable #chat-log box. */
+#chat-log .msg {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#chat-log .msg-label {
+    height: auto;
+}
+
 #ask {
     margin-top: 1;
 }
