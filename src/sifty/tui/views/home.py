@@ -1,4 +1,4 @@
-"""Home dashboard: volume gauges + at-a-glance stat widgets per area."""
+"""Home dashboard: volume gauges + an at-a-glance summary of every area."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import logging
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Grid
 from textual.widgets import Button, Static
 
 from ...console import human_size
@@ -20,18 +19,22 @@ from .base import BaseView
 
 logger = logging.getLogger("sifty.tui")
 
+# (key, label) for each at-a-glance stat line, in display order.
+_STATS = [
+    ("junk", "Junk"),
+    ("updates", "Updates"),
+    ("apps", "Apps"),
+    ("startup", "Startup"),
+    ("services", "Services"),
+    ("history", "History"),
+]
+
 
 class HomeView(BaseView):
     def compose(self) -> ComposeResult:
         yield Static("Overview", classes="title")
         yield Panel(Static("Reading volumes…", id="vol-body"), title="Volumes")
-        with Grid(id="home-stats"):
-            yield Panel(Static("…", id="junk-total"), title="Junk")
-            yield Panel(Static("Checking…", id="updates-summary"), title="Updates")
-            yield Panel(Static("…", id="apps-summary"), title="Apps")
-            yield Panel(Static("…", id="startup-summary"), title="Startup")
-            yield Panel(Static("…", id="services-summary"), title="Services")
-            yield Panel(Static("…", id="history-summary"), title="History")
+        yield Panel(Static("", id="stats-body"), title="At a glance")
         if not is_admin():
             with Panel(title="Administrator"):
                 yield Static(
@@ -47,10 +50,13 @@ class HomeView(BaseView):
             )
 
     def on_mount(self) -> None:
+        self._stats: dict[str, str] = {k: "…" for k, _ in _STATS}
         self._render_volumes()  # fast (psutil), no worker needed
-        self._set("history-summary", self._history_text())  # fast (sqlite)
+        self._stats["updates"] = "checking…"
+        self._stats["history"] = self._history_text()  # fast (sqlite)
+        self._render_stats()
         if self.workers_enabled():
-            self.compute_junk_total()
+            self.compute_junk()
             self.compute_apps()
             self.compute_startup()
             self.compute_services()
@@ -60,13 +66,7 @@ class HomeView(BaseView):
         if event.button.id == "elevate":
             self.app.action_elevate()
 
-    # ----------------------------------------------------------------- helpers
-    def _set(self, widget_id: str, text) -> None:
-        try:
-            self.query_one(f"#{widget_id}", Static).update(text)
-        except Exception:
-            pass
-
+    # ----------------------------------------------------------------- render
     def _render_volumes(self) -> None:
         text = Text()
         for i, v in enumerate(disk.volumes()):
@@ -78,29 +78,40 @@ class HomeView(BaseView):
                 style="bold",
             )
             text.append(usage_gauge(v.percent))
-        self._set("vol-body", text)
+        try:
+            self.query_one("#vol-body", Static).update(text)
+        except Exception:
+            pass
+
+    def _render_stats(self) -> None:
+        lines = "\n".join(f"[b]{label:<9}[/b] {self._stats[key]}" for key, label in _STATS)
+        try:
+            self.query_one("#stats-body", Static).update(lines)
+        except Exception:
+            pass
+
+    def _set_stat(self, key: str, value: str) -> None:
+        self._stats[key] = value
+        self._render_stats()
 
     def _history_text(self) -> str:
         try:
             summ = history.summary()
         except Exception:
-            return "No history yet."
+            return "no history yet"
         if not summ["runs"]:
-            return "Nothing cleaned yet."
-        return f"Reclaimed [b]{human_size(summ['bytes_freed'])}[/b] over {summ['runs']} runs"
+            return "nothing cleaned yet"
+        return f"reclaimed [b]{human_size(summ['bytes_freed'])}[/b] over {summ['runs']} runs"
 
     # ----------------------------------------------------------------- workers
     @work(thread=True, exclusive=True, group="home-junk")
-    def compute_junk_total(self) -> None:
+    def compute_junk(self) -> None:
         try:
             total = sum(cat.size for cat in junk.scan())
         except Exception:
             logger.exception("Home: junk total scan failed")
             return
-        self.app.call_from_thread(
-            self._set, "junk-total",
-            f"[b]{human_size(total)}[/b] reclaimable [dim](open Junk to clean)[/dim]",
-        )
+        self.app.call_from_thread(self._set_stat, "junk", f"[b]{human_size(total)}[/b] reclaimable")
 
     @work(thread=True, exclusive=True, group="home-apps")
     def compute_apps(self) -> None:
@@ -111,11 +122,10 @@ class HomeView(BaseView):
             return
         if installed:
             largest = max(installed, key=lambda a: a.size_bytes)
-            text = (f"[b]{len(installed)}[/b] installed · largest: "
-                    f"{largest.name} ({human_size(largest.size_bytes)})")
+            value = f"[b]{len(installed)}[/b] installed · largest {largest.name} ({human_size(largest.size_bytes)})"
         else:
-            text = "No apps found."
-        self.app.call_from_thread(self._set, "apps-summary", text)
+            value = "none found"
+        self.app.call_from_thread(self._set_stat, "apps", value)
 
     @work(thread=True, exclusive=True, group="home-startup")
     def compute_startup(self) -> None:
@@ -125,10 +135,7 @@ class HomeView(BaseView):
             logger.exception("Home: startup summary failed")
             return
         enabled = sum(1 for e in entries if e.enabled)
-        self.app.call_from_thread(
-            self._set, "startup-summary",
-            f"[b]{len(entries)}[/b] programs · {enabled} enabled",
-        )
+        self.app.call_from_thread(self._set_stat, "startup", f"[b]{len(entries)}[/b] programs · {enabled} enabled")
 
     @work(thread=True, exclusive=True, group="home-services")
     def compute_services(self) -> None:
@@ -139,20 +146,17 @@ class HomeView(BaseView):
             return
         present = sum(1 for s in items if s.present)
         disabled = sum(1 for s in items if s.start_type == "disabled")
-        self.app.call_from_thread(
-            self._set, "services-summary",
-            f"[b]{present}[/b] optional · {disabled} disabled",
-        )
+        self.app.call_from_thread(self._set_stat, "services", f"[b]{present}[/b] optional · {disabled} disabled")
 
     @work(thread=True, exclusive=True, group="home-updates")
     def compute_updates(self) -> None:
         try:
             if not winget.available():
-                text = "winget unavailable"
+                value = "winget unavailable"
             else:
                 ups = updates.list_upgrades()
-                text = f"[b]{len(ups)}[/b] updates available" if ups else "Up to date"
+                value = f"[b]{len(ups)}[/b] available" if ups else "up to date"
         except Exception:
             logger.exception("Home: updates summary failed")
             return
-        self.app.call_from_thread(self._set, "updates-summary", text)
+        self.app.call_from_thread(self._set_stat, "updates", value)

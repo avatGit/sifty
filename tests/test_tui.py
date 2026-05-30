@@ -53,13 +53,14 @@ def test_command_palette_entries_cover_sections_and_admin():
     assert len(entries) == len(SECTIONS) + 1
 
 
-async def test_home_has_stat_widgets():
+async def test_home_shows_at_a_glance_stats():
     async with _make_app().run_test() as pilot:
         await pilot.pause()
-        # At-a-glance summary widgets (like Volumes/Junk), one per area.
-        for wid in ("junk-total", "updates-summary", "apps-summary",
-                    "startup-summary", "services-summary", "history-summary"):
-            assert pilot.app.screen.query_one(f"#{wid}", Static) is not None
+        body = pilot.app.screen.query_one("#stats-body", Static)
+        rendered = str(body.render())
+        # Every area is labelled in the at-a-glance panel.
+        for label in ("Junk", "Updates", "Apps", "Startup", "Services", "History"):
+            assert label in rendered
 
 
 async def test_command_palette_registered():

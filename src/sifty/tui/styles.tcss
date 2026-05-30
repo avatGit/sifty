@@ -99,13 +99,6 @@ DataTable {
     min-height: 8;
 }
 
-/* Home dashboard: grid of at-a-glance stat cards. */
-#home-stats {
-    grid-size: 2;
-    grid-gutter: 0 2;
-    grid-rows: auto;
-    height: auto;
-}
 
 SelectionList {
     height: auto;

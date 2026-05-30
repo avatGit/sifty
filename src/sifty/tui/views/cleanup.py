@@ -38,7 +38,7 @@ class CleanupView(BaseView):
             yield Button("Large files", id="mode-large")
             yield Button("Stale downloads", id="mode-stale")
         yield Panel(DataTable(id="cleanup-table"), title="Results", id="cleanup-panel")
-        with Horizontal(classes="actions"):
+        with Horizontal(classes="actions", id="cleanup-actions"):
             yield Button("Clear marks", id="clear-marks")
             yield Button("Clean selected", id="clean", variant="warning")
         yield Static("Pick a mode to scan.", id="cleanup-status", classes="status")
@@ -50,7 +50,9 @@ class CleanupView(BaseView):
         table = self.query_one("#cleanup-table", DataTable)
         table.cursor_type = "row"
         self._cols = table.add_columns("", "Size", "Path")
-        self.query_one("#cleanup-panel").display = False  # hidden until a scan finds something
+        # Results panel + action buttons stay hidden until a scan finds something.
+        self.query_one("#cleanup-panel").display = False
+        self.query_one("#cleanup-actions").display = False
 
     def _path(self) -> Path:
         return Path(self.query_one("#cleanup-path", Input).value or str(Path.home())).expanduser()
@@ -65,6 +67,7 @@ class CleanupView(BaseView):
             self._mode = bid.removeprefix("mode-")
             self._status(f"Scanning ({self._mode})…")
             self.query_one("#cleanup-panel").display = True
+            self.query_one("#cleanup-actions").display = False  # nothing to act on yet
             self.query_one("#cleanup-table", DataTable).loading = True
             self.scan()
         elif bid == "clear-marks":
@@ -96,6 +99,7 @@ class CleanupView(BaseView):
     def _scan_failed(self, exc: Exception) -> None:
         self.query_one("#cleanup-table", DataTable).loading = False
         self.query_one("#cleanup-panel").display = False
+        self.query_one("#cleanup-actions").display = False
         self._status(f"Failed: {exc}")
 
     def _populate(self, rows: list[tuple[Path, int]], premark: bool) -> None:
@@ -104,9 +108,11 @@ class CleanupView(BaseView):
         self.query_one("#cleanup-table", DataTable).loading = False
         if not rows:
             self.query_one("#cleanup-panel").display = False
+            self.query_one("#cleanup-actions").display = False
             self._status(f"Nothing found ({self._mode}).")
             return
         self.query_one("#cleanup-panel").display = True
+        self.query_one("#cleanup-actions").display = True
         self._rebuild_table()
 
     def _rebuild_table(self) -> None:
