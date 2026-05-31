@@ -44,6 +44,7 @@ SIFTY_THEME = Theme(
 SECTIONS: list[tuple[str, str]] = [
     ("home", "Home"),
     ("cleanup", "Cleanup"),
+    ("ai", "AI"),
     ("junk", "Junk"),
     ("disk", "Disk"),
     ("apps", "Apps"),
@@ -51,7 +52,6 @@ SECTIONS: list[tuple[str, str]] = [
     ("services", "Services"),
     ("updates", "Updates"),
     ("reports", "Reports"),
-    ("ai", "AI"),
 ]
 
 

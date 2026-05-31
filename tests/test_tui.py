@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from textual.widgets import DataTable, Input, SelectionList, Static, Tree
+from textual.widgets import Button, DataTable, Input, Select, SelectionList, Static, Tree
 
 from sifty.core.apps import InstalledApp
 from sifty.core.junk import CategoryScan, JunkCategory
@@ -20,6 +20,7 @@ from sifty.tui.commands import SiftyCommands, _entries
 from sifty.tui.modals import ConfirmModal
 from sifty.core.models import StartupEntry
 from sifty.tui.views import (
+    AIView,
     AppsView,
     CleanupView,
     DiskView,
@@ -279,6 +280,30 @@ async def test_junk_clean_opens_confirm_in_worker():
         await pilot.press("escape")  # cancel
         await pilot.pause()
         assert not isinstance(pilot.app.screen, ConfirmModal)
+
+
+async def test_ai_view_has_autonomy_and_quick_actions():
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("ai")
+        await pilot.pause()
+        select = pilot.app.query_one("#autonomy", Select)
+        assert select.value in ("ask", "low_risk_auto", "full_auto")
+        # Quick-action buttons are present.
+        assert len(pilot.app.query(".quick")) == 3
+
+
+async def test_ai_view_replays_stored_conversation():
+    async with _make_app().run_test() as pilot:
+        # Seed a prior conversation on the app before opening the screen.
+        pilot.app._ai_messages = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello there"},
+        ]
+        await pilot.app.show("ai")
+        await pilot.pause()
+        pilot.app.query_one(AIView)
+        # Both turns were re-rendered into the transcript as message widgets.
+        assert len(pilot.app.query("#chat-log Static")) >= 2
 
 
 async def test_disk_view_shows_biggest_items():

@@ -142,6 +142,18 @@ Tree {
     height: auto;
 }
 
+#chat-log .msg-user { height: auto; margin-bottom: 1; }
+#chat-log .msg-thinking { height: auto; color: $secondary; }
+#chat-log .msg-tool { height: auto; color: $secondary; margin-bottom: 1; }
+#chat-log .msg-table { height: auto; margin-bottom: 1; }
+
+#ai-controls { height: auto; margin-bottom: 1; }
+#ai-controls .ctl-label { padding: 1 1 0 0; color: $text-muted; width: auto; }
+#ai-controls Select { width: 30; }
+
+#ai-quick { height: auto; margin-bottom: 1; }
+#ai-quick .quick { margin-right: 1; }
+
 #ask {
     margin-top: 1;
 }
