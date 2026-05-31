@@ -1,18 +1,17 @@
-"""AI screen: a chat panel backed by the local Ollama advisor.
+"""AI screen: a chat panel backed by the local Ollama agent/advisor.
 
-The transcript is a scrollable column of message widgets (not a RichLog), so
-the *streaming* reply can be rendered into a message that lives inside the chat
-box and updated in place as tokens arrive — instead of spilling into a separate
-area outside the box until it completes.
-
-The model answers in Markdown, so replies are rendered through Rich's
-:class:`~rich.markdown.Markdown` — headings, bold/italic, code fences and
-tables show up formatted instead of as literal ``**asterisks**`` and backticks.
+The transcript is a scrollable column of message widgets so both streaming
+replies and tool-call events can be rendered in place as they arrive.
 
 Conversation memory: the full message history is kept in ``_messages`` and sent
-to Ollama each turn so the model can refer back to earlier exchanges.  The
-system prompt is built once on mount (and includes a live machine-context
-snapshot) so answers are grounded in *this* machine's state.
+each turn so the model can refer back to earlier exchanges.  The system prompt
+is built once on mount with a live machine-context snapshot so answers are
+grounded in *this* machine's state.
+
+Agentic mode: when Ollama supports tools the view drives :mod:`ai.agent`, which
+yields :class:`ToolCallEvent`, :class:`ToolResultEvent`, and
+:class:`FinalAnswerEvent`.  Models that ignore the tools field produce a
+:class:`FallbackEvent` and the view transparently degrades to plain streaming.
 """
 
 from __future__ import annotations
@@ -28,7 +27,16 @@ from textual.widgets import Input, Static
 
 from ...ai import context as ai_context
 from ...ai.advisor import SYSTEM_PROMPT
+from ...ai.agent import (
+    FallbackEvent,
+    FinalAnswerEvent,
+    ToolCallEvent,
+    ToolResultEvent,
+    autonomy_from_config,
+    run as agent_run,
+)
 from ...ai.client import OllamaClient, OllamaUnavailable
+from ...ai.tools import TOOLS as ALL_TOOLS
 from .base import BaseView
 
 logger = logging.getLogger("sifty.tui")
@@ -46,14 +54,14 @@ class AIView(BaseView):
 
     def on_mount(self) -> None:
         self._client = OllamaClient.from_config()
-        self._live: Static | None = None  # the in-progress Sifty reply widget
-        self._messages: list[dict] = []   # full conversation history (Ollama format)
+        self._live: Static | None = None     # in-progress streaming widget
+        self._messages: list[dict] = []      # full Ollama-format conversation history
         self._system = self._build_system()
+        self._autonomy = autonomy_from_config()
         if self.workers_enabled():
             self.check_status()
 
     def _build_system(self) -> str:
-        """Combine the advisor system prompt with a live machine-context snapshot."""
         ctx = ai_context.build()
         if ctx:
             return f"{SYSTEM_PROMPT}\n\n{ctx}"
@@ -67,7 +75,10 @@ class AIView(BaseView):
     def _set_status(self, ok: bool) -> None:
         status = self.query_one("#ai-status", Static)
         if ok:
-            status.update(f"[green]●[/green] Ollama connected · model [b]{self._client.model}[/b]")
+            status.update(
+                f"[green]●[/green] Ollama connected · model [b]{self._client.model}[/b] · "
+                f"autonomy: [b]{self._autonomy}[/b]"
+            )
         else:
             status.update(
                 f"[yellow]●[/yellow] Ollama not reachable at {self._client.host} — "
@@ -81,54 +92,104 @@ class AIView(BaseView):
         log = self.query_one("#chat-log", VerticalScroll)
         self.query_one("#ask", Input).value = ""
         await log.mount(Static(f"[b cyan]You[/b cyan]  {escape(question)}", classes="msg"))
-        await log.mount(Static("[b green]Sifty[/b green]", classes="msg-label"))
-        self._live = Static("[dim]thinking…[/dim]", classes="msg")
-        await log.mount(self._live)
-        log.scroll_end(animate=False)
-        # Append the user turn to history before the worker reads it.
         self._messages.append({"role": "user", "content": question})
-        self.ask(list(self._messages))  # pass a snapshot so the worker is safe
+        self.ask(list(self._messages))
 
     @work(thread=True, exclusive=True, group="ai-chat")
     def ask(self, messages: list[dict]) -> None:
         if not self._client.is_available():
-            self.app.call_from_thread(self._finish, None, None)
+            self.app.call_from_thread(self._show_error, "AI unavailable — is Ollama running?")
             return
-        # Prepend the system message for this request.
-        full = [{"role": "system", "content": self._system}] + messages
-        parts: list[str] = []
+
+        full_messages = [{"role": "system", "content": self._system}] + messages
+
+        # Confirm callback: in the TUI we default-deny for safety; future work
+        # can wire a ConfirmModal here.
+        def confirm(prompt: str) -> bool:
+            return False
+
         try:
-            for chunk in self._client.chat_stream("", "", messages=full):
-                parts.append(chunk)
-                self.app.call_from_thread(self._stream, "".join(parts))
-        except OllamaUnavailable as exc:
-            self.app.call_from_thread(self._finish, None, str(exc))
-            return
-        except Exception as exc:  # never let a worker die silently
-            logger.exception("AI chat failed")
-            self.app.call_from_thread(self._finish, None, str(exc))
-            return
-        answer = "".join(parts).strip()
-        self.app.call_from_thread(self._finish, answer, None)
+            for event in agent_run(
+                self._client,
+                full_messages,
+                autonomy=self._autonomy,
+                confirm=confirm,
+                tools=ALL_TOOLS,
+            ):
+                if isinstance(event, ToolCallEvent):
+                    self.app.call_from_thread(self._show_tool_call, event)
+                elif isinstance(event, ToolResultEvent):
+                    self.app.call_from_thread(self._show_tool_result, event)
+                elif isinstance(event, (FinalAnswerEvent, FallbackEvent)):
+                    # For fallback we try streaming instead for a better UX.
+                    if isinstance(event, FallbackEvent):
+                        self.app.call_from_thread(self._start_streaming_reply)
+                        parts: list[str] = []
+                        try:
+                            for chunk in self._client.chat_stream("", "", messages=full_messages):
+                                parts.append(chunk)
+                                self.app.call_from_thread(self._stream, "".join(parts))
+                        except OllamaUnavailable as exc:
+                            self.app.call_from_thread(self._show_error, str(exc))
+                            return
+                        answer = "".join(parts).strip()
+                    else:
+                        answer = event.text
+                    self.app.call_from_thread(self._finish_reply, answer)
+                    if answer and not isinstance(event, FallbackEvent):
+                        self._messages.append({"role": "assistant", "content": answer})
+        except Exception as exc:
+            logger.exception("AI agent failed")
+            self.app.call_from_thread(self._show_error, str(exc))
+
+    # ------------------------------------------------------------------
+    # Thread-safe UI helpers (called via call_from_thread)
+    # ------------------------------------------------------------------
+
+    def _show_tool_call(self, event: ToolCallEvent) -> None:
+        log = self.query_one("#chat-log", VerticalScroll)
+        args_str = ", ".join(f"{k}={v!r}" for k, v in event.args.items()) if event.args else ""
+        label = f"[dim]⚙ {event.tool_name}({args_str}) [{event.risk}][/dim]"
+        self.app.call_later(log.mount, Static(label, classes="msg-tool"))
+        log.scroll_end(animate=False)
+
+    def _show_tool_result(self, event: ToolResultEvent) -> None:
+        log = self.query_one("#chat-log", VerticalScroll)
+        prefix = "[dim]✗ skipped[/dim]" if event.skipped else "[dim]✓[/dim]"
+        self.app.call_later(log.mount, Static(
+            f"{prefix} [dim]{escape(event.result[:120])}[/dim]", classes="msg-tool"
+        ))
+        log.scroll_end(animate=False)
+
+    def _start_streaming_reply(self) -> None:
+        log = self.query_one("#chat-log", VerticalScroll)
+        self.app.call_later(log.mount, Static("[b green]Sifty[/b green]", classes="msg-label"))
+        self._live = Static("[dim]thinking…[/dim]", classes="msg")
+        self.app.call_later(log.mount, self._live)
+        log.scroll_end(animate=False)
 
     def _stream(self, text: str) -> None:
-        """Render the in-progress answer (as Markdown) while tokens arrive."""
         if self._live is None:
             return
         self._live.update(Markdown(text))
         self.query_one("#chat-log", VerticalScroll).scroll_end(animate=False)
 
-    def _finish(self, answer: str | None, err: str | None) -> None:
-        """Replace the in-progress reply with the completed answer or an error."""
-        if self._live is None:
-            return
-        if err is not None:
-            self._live.update(f"[yellow](error talking to Ollama: {escape(err)})[/yellow]")
-        elif not answer:
-            self._live.update("[yellow]AI unavailable — is Ollama running?[/yellow]")
-        else:
+    def _finish_reply(self, answer: str) -> None:
+        log = self.query_one("#chat-log", VerticalScroll)
+        if self._live is not None:
             self._live.update(Markdown(answer))
-            # Record the assistant reply so the next turn has full context.
-            self._messages.append({"role": "assistant", "content": answer})
-        self._live = None
-        self.query_one("#chat-log", VerticalScroll).scroll_end(animate=False)
+            self._live = None
+        else:
+            self.app.call_later(log.mount, Static("[b green]Sifty[/b green]", classes="msg-label"))
+            self.app.call_later(log.mount, Static(Markdown(answer), classes="msg"))
+        log.scroll_end(animate=False)
+
+    def _show_error(self, err: str) -> None:
+        log = self.query_one("#chat-log", VerticalScroll)
+        self.app.call_later(log.mount, Static(
+            f"[yellow](error: {escape(err)})[/yellow]", classes="msg"
+        ))
+        log.scroll_end(animate=False)
+        if self._live is not None:
+            self._live.update(f"[yellow](error: {escape(err)})[/yellow]")
+            self._live = None

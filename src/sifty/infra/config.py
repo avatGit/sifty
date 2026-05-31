@@ -26,6 +26,11 @@ DEFAULTS: dict[str, Any] = {
         # How long Ollama keeps the model resident after a request, so the next
         # question doesn't pay the cold-load cost again.
         "keep_alive": "10m",
+        # Agentic autonomy level: "ask" | "low_risk_auto" | "full_auto".
+        # "ask"           — confirm every mutating tool call (safe default).
+        # "low_risk_auto" — auto-run low-risk tools; confirm high-risk ones.
+        # "full_auto"     — run all tools without prompting (still uses Recycle Bin).
+        "autonomy": "ask",
     },
     "safety": {
         # User-supplied extra paths that must never be touched, on top of the

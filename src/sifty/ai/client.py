@@ -61,13 +61,16 @@ class OllamaClient:
         except httpx.HTTPError:
             return False
 
-    def _payload(self, messages: list[dict]) -> dict:
-        return {
+    def _payload(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
+        payload: dict = {
             "model": self.model,
             "stream": True,
             "keep_alive": self.keep_alive,
             "messages": messages,
         }
+        if tools:
+            payload["tools"] = tools
+        return payload
 
     def _build_messages(self, system: str, user: str) -> list[dict]:
         return [
@@ -130,3 +133,34 @@ class OllamaClient:
         single-turn exchange. Consumes :meth:`chat_stream` internally.
         """
         return "".join(self.chat_stream(system, user, messages=messages)).strip()
+
+    def chat_once(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+    ) -> dict:
+        """Non-streaming POST to /api/chat; returns the full assistant message dict.
+
+        Use for agentic steps where you need to inspect ``tool_calls`` before
+        deciding whether to dispatch or yield a final answer.  The returned dict
+        is shaped like ``{"role": "assistant", "content": "...", "tool_calls": [...]}``;
+        ``tool_calls`` is absent (or empty) when the model produces a plain reply.
+        Raises :class:`OllamaUnavailable` on network or HTTP errors.
+        """
+        payload = self._payload(messages, tools)
+        payload["stream"] = False
+        try:
+            resp = httpx.post(
+                f"{self.host}/api/chat",
+                json=payload,
+                timeout=self._timeout(),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("message", {"role": "assistant", "content": ""})
+        except httpx.TimeoutException as exc:
+            raise OllamaUnavailable(
+                "timed out — the model may still be loading; try again"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise OllamaUnavailable(str(exc)) from exc
