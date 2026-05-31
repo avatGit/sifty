@@ -8,11 +8,14 @@ import typer
 
 from .. import __version__
 from ..console import confirm, console, error, human_size, success, warn
-from ..core import history, undo
+from ..core import history, profiles, undo
+from ..core import junk as core_junk
 from ..infra.logging import get_logger, log_file, setup_logging
 from ..windows.admin import is_admin, relaunch_as_admin
 from . import output
-from .commands import ai_group, apps, cleanup, disk, junk, organize, services, startup, updates
+from .commands import (
+    ai_group, apps, cleanup, disk, junk, organize, profile, services, startup, updates,
+)
 
 app = typer.Typer(
     name="sifty",
@@ -27,6 +30,7 @@ app.add_typer(cleanup.app, name="cleanup")
 app.add_typer(apps.app, name="apps")
 app.add_typer(startup.app, name="startup")
 app.add_typer(services.app, name="services")
+app.add_typer(profile.app, name="profile")
 app.add_typer(updates.app, name="update")
 app.add_typer(organize.app, name="organize")
 app.add_typer(ai_group.app, name="ai")
@@ -111,6 +115,39 @@ def logs_cmd(
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     for line in lines[-tail:]:
         console.print(line, markup=False, highlight=False)
+
+
+@app.command("clean")
+def clean_cmd(
+    profile_name: str = typer.Option(..., "--profile", "-p", help="Cleanup profile to run."),
+    apply: bool = typer.Option(False, "--apply", help="Actually move items to the Recycle Bin."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+) -> None:
+    """Run a saved cleanup profile (used by scheduled tasks)."""
+    prof = profiles.get(profile_name)
+    if prof is None:
+        error(f"No profile named '{profile_name}'. See `sifty profile list`.")
+        raise typer.Exit(1)
+    only = set(prof.categories) or None
+
+    preview = core_junk.clean(only=only, dry_run=True)
+    if preview.items == 0:
+        success("Nothing to clean — already tidy.")
+        return
+    console.print(
+        f"Profile [bold]{profile_name}[/bold]: {preview.items:,} items "
+        f"({human_size(preview.bytes_freed)})."
+    )
+    if not apply:
+        console.print("[dim]Dry-run — re-run with --apply to remove.[/dim]")
+        return
+    if not confirm(f"Move {preview.items:,} items ({human_size(preview.bytes_freed)}) to the Recycle Bin?", assume_yes=yes):
+        warn("Cancelled.")
+        return
+    result = core_junk.clean(only=only, dry_run=False)
+    history.record_clean(f"profile:{profile_name}", ",".join(sorted(prof.categories)),
+                         result.bytes_freed, result.items, result.trashed)
+    success(f"Sent {result.items:,} items ({human_size(result.bytes_freed)}) to the Recycle Bin.")
 
 
 @app.command("history")

@@ -83,6 +83,12 @@ class CleanResult:
 
 
 @dataclass
+class Profile:
+    name: str
+    categories: list[str]  # junk category keys this profile cleans
+
+
+@dataclass
 class ServiceInfo:
     name: str
     label: str
