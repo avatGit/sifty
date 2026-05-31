@@ -15,7 +15,7 @@ from ..windows.admin import is_admin, relaunch_as_admin
 from . import output
 from .commands import (
     ai_group, apps, cleanup, disk, junk, organize, profile, schedule, services,
-    startup, updates,
+    startup, updates, watch,
 )
 
 app = typer.Typer(
@@ -35,6 +35,7 @@ app.add_typer(profile.app, name="profile")
 app.add_typer(schedule.app, name="schedule")
 app.add_typer(updates.app, name="update")
 app.add_typer(organize.app, name="organize")
+app.add_typer(watch.app, name="watch")
 app.add_typer(ai_group.app, name="ai")
 
 

@@ -37,6 +37,10 @@ DEFAULTS: dict[str, Any] = {
         # default — those are often wanted).
         "include_downloads_installers": False,
     },
+    "watch": {
+        # Free-space threshold (GB) below which `sifty watch check` warns/toasts.
+        "threshold_gb": 5,
+    },
 }
 
 

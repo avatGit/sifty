@@ -44,7 +44,7 @@ def sifty_command(profile: str) -> str:
 
 def watch_command(threshold_gb: int) -> str:
     """The command a scheduled task runs to check free space and toast."""
-    return f'"{sys.executable}" -m sifty watch --check --threshold {threshold_gb}'
+    return f'"{sys.executable}" -m sifty watch check --threshold {threshold_gb}'
 
 
 def add(name: str, profile: str, command: str, sc: str, day: str, time: str) -> tuple[bool, str]:
