@@ -54,11 +54,13 @@ def clean_cmd(
     category: list[str] = typer.Option(None, "--category", "-c", help="Limit to category key(s)."),
     apply: bool = typer.Option(False, "--apply", help="Actually move items to the Recycle Bin."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+    exclude: list[str] = typer.Option(None, "--exclude", "-x", help="Extra path(s) to never delete."),
 ) -> None:
     """Move junk to the Recycle Bin. Dry-run unless --apply is given."""
     only = set(category) if category else None
+    extra_protected = list(exclude) if exclude else None
 
-    preview = junk.clean(only=only, dry_run=True)
+    preview = junk.clean(only=only, dry_run=True, extra_protected=extra_protected)
     if preview.items == 0:
         success("Nothing to clean — you're already tidy.")
         return
@@ -75,7 +77,7 @@ def clean_cmd(
         warn("Cancelled.")
         return
 
-    result = junk.clean(only=only, dry_run=False)
+    result = junk.clean(only=only, dry_run=False, extra_protected=extra_protected)
     history.record_clean(
         "junk", ",".join(sorted(only)) if only else "all",
         result.bytes_freed, result.items, result.trashed,

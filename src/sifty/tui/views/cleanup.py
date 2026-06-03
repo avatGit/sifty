@@ -39,7 +39,8 @@ class CleanupView(BaseView):
             yield Button("Stale downloads", id="mode-stale")
         yield Panel(DataTable(id="cleanup-table"), title="Results", id="cleanup-panel")
         with Horizontal(classes="actions", id="cleanup-actions"):
-            yield Button("Clear marks", id="clear-marks")
+            yield Button("Select all", id="select-all")
+            yield Button("Deselect all", id="deselect-all")
             yield Button("Clean selected", id="clean", variant="warning")
         yield Static("Pick a mode to scan.", id="cleanup-status", classes="status")
 
@@ -70,7 +71,10 @@ class CleanupView(BaseView):
             self.query_one("#cleanup-actions").display = False  # nothing to act on yet
             self.query_one("#cleanup-table", DataTable).loading = True
             self.scan()
-        elif bid == "clear-marks":
+        elif bid == "select-all":
+            self._marked = {str(p) for p, _s in self._rows}
+            self._rebuild_table()
+        elif bid == "deselect-all":
             self._marked.clear()
             self._rebuild_table()
         elif bid == "clean":
@@ -82,10 +86,10 @@ class CleanupView(BaseView):
         try:
             if mode == "duplicates":
                 groups = disk.find_duplicates(self._path(), 1024)
-                rows = [(p, disk._entry_size(p)) for p in cleanup.choose_duplicate_deletions(groups)]
+                rows = [(p, disk._entry_size(p)) for p in cleanup.choose_duplicate_deletions(groups, recent_days=7)]
                 premark = True
             elif mode == "large":
-                rows = cleanup.find_large_files(self._path())
+                rows = cleanup.find_large_files(self._path(), recent_days=7)
                 premark = False
             else:  # stale
                 rows = [(p, s) for p, s, _m in cleanup.find_stale_downloads()]

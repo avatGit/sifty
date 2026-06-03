@@ -21,6 +21,9 @@ def duplicates_cmd(
     min_size: int = typer.Option(1024, "--min-size", help="Ignore files smaller than this (bytes)."),
     apply: bool = typer.Option(False, "--apply", help="Trash the redundant copies (keeps one each)."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+    exclude: list[str] = typer.Option(None, "--exclude", "-x", help="Extra path(s) to never delete."),
+    recent_days: int = typer.Option(cleanup.DEFAULT_RECENT_DAYS, "--recent-days",
+                                    help="Protect files modified within N days (0 = off)."),
 ) -> None:
     """Find duplicates and (with --apply) trash all but one copy of each."""
     path = path.expanduser()
@@ -30,8 +33,9 @@ def duplicates_cmd(
 
     with console.status(f"Hashing files under {path}…") if not output.json_enabled() else _null():
         groups = disk.find_duplicates(path, min_size)
-    to_delete = cleanup.choose_duplicate_deletions(groups)
-    preview = cleanup.trash_paths(to_delete, dry_run=True)
+    to_delete = cleanup.choose_duplicate_deletions(groups, recent_days=recent_days)
+    extra = list(exclude) if exclude else None
+    preview = cleanup.trash_paths(to_delete, dry_run=True, extra_protected=extra)
 
     if output.json_enabled():
         output.emit({"groups": len(groups), "redundant": preview.items,
@@ -50,7 +54,7 @@ def duplicates_cmd(
     if not confirm(f"Move {preview.items} redundant copies ({human_size(preview.bytes_freed)}) to the Recycle Bin?", assume_yes=yes):
         warn("Cancelled.")
         return
-    result = cleanup.trash_paths(to_delete, dry_run=False)
+    result = cleanup.trash_paths(to_delete, dry_run=False, extra_protected=extra)
     history.record_clean("cleanup-duplicates", str(path), result.bytes_freed, result.items, result.trashed)
     success(f"Sent {result.items} copies ({human_size(result.bytes_freed)}) to the Recycle Bin.")
 
@@ -60,6 +64,8 @@ def large_cmd(
     path: Path = typer.Argument(..., help="Directory to scan."),
     min_size: int = typer.Option(cleanup.DEFAULT_LARGE_MIN, "--min-size", help="Minimum file size (bytes)."),
     top: int = typer.Option(30, "--top", "-n", help="How many to show."),
+    recent_days: int = typer.Option(cleanup.DEFAULT_RECENT_DAYS, "--recent-days",
+                                    help="Omit files modified within N days (0 = off)."),
 ) -> None:
     """List the biggest files under a path (review, then delete in the TUI)."""
     path = path.expanduser()
@@ -67,7 +73,7 @@ def large_cmd(
         warn(f"Path does not exist: {path}")
         raise typer.Exit(1)
 
-    items = cleanup.find_large_files(path, min_size, top)
+    items = cleanup.find_large_files(path, min_size, top, recent_days=recent_days)
     if output.json_enabled():
         output.emit([{"path": str(p), "size_bytes": s} for p, s in items])
         return
@@ -87,6 +93,7 @@ def stale_cmd(
     days: int = typer.Option(cleanup.DEFAULT_STALE_DAYS, "--days", help="Older-than threshold (days)."),
     apply: bool = typer.Option(False, "--apply", help="Trash the stale items."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+    exclude: list[str] = typer.Option(None, "--exclude", "-x", help="Extra path(s) to never delete."),
 ) -> None:
     """Find old items in Downloads and (with --apply) trash them."""
     items = cleanup.find_stale_downloads(days)
@@ -114,7 +121,8 @@ def stale_cmd(
     if not confirm(f"Move {len(items)} stale items ({human_size(total)}) to the Recycle Bin?", assume_yes=yes):
         warn("Cancelled.")
         return
-    result = cleanup.trash_paths([p for p, _s, _m in items], dry_run=False)
+    extra = list(exclude) if exclude else None
+    result = cleanup.trash_paths([p for p, _s, _m in items], dry_run=False, extra_protected=extra)
     history.record_clean("cleanup-stale", f"Downloads >{days}d", result.bytes_freed, result.items, result.trashed)
     success(f"Sent {result.items} items ({human_size(result.bytes_freed)}) to the Recycle Bin.")
 

@@ -61,6 +61,16 @@ class OllamaClient:
         except httpx.HTTPError:
             return False
 
+    def list_models(self) -> list[str]:
+        """Return the names of locally-pulled Ollama models (empty on error)."""
+        try:
+            resp = httpx.get(f"{self.host}/api/tags", timeout=3.0)
+            if resp.status_code != 200:
+                return []
+            return [m.get("name", "") for m in resp.json().get("models", [])]
+        except httpx.HTTPError:
+            return []
+
     def _payload(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
         payload: dict = {
             "model": self.model,

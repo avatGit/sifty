@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 
 import typer
@@ -22,7 +23,7 @@ app = typer.Typer(
     name="sifty",
     help="Sifty — AI-assisted Windows maintenance: junk, disk, apps, updates, files.",
     no_args_is_help=True,
-    add_completion=False,
+    add_completion=True,
 )
 
 app.add_typer(junk.app, name="junk")
@@ -55,6 +56,17 @@ def main(
     """Sifty — AI-assisted Windows maintenance."""
     setup_logging(verbose)
     output.set_json(json_output)
+    # Auto-enable JSON when stdout is a real pipe. Use os.isatty(fileno()) rather
+    # than sys.stdout.isatty() so that test runners (which swap sys.stdout for a
+    # BytesIO/StringIO with no file descriptor) raise UnsupportedOperation and we
+    # leave JSON mode off — only a real piped fd triggers it.
+    if not json_output:
+        import io
+        try:
+            if not os.isatty(sys.stdout.fileno()):
+                output.set_json(True)
+        except (AttributeError, io.UnsupportedOperation, ValueError):
+            pass  # not a real file descriptor — leave JSON mode off
     get_logger("sifty.cli").debug("invoked: %s", " ".join(sys.argv[1:]))
     if admin and not is_admin():
         if relaunch_as_admin():
@@ -147,27 +159,97 @@ def version_cmd() -> None:
 
 @app.command("doctor")
 def doctor_cmd() -> None:
-    """Report environment readiness (admin rights, winget, Ollama)."""
+    """Report environment readiness: admin, winget, Ollama, disk, reboot state."""
+    import winreg
+
+    import psutil
+
     from ..ai.client import OllamaClient
+    from ..infra.config import audit_log_path
     from ..windows import winget
 
     admin = is_admin()
     has_winget = winget.available()
     client = OllamaClient.from_config()
-    ollama = client.is_available()
+    ollama_up = client.is_available()
+
+    # Free space on the system volume.
+    sys_root = os.environ.get("SystemDrive", "C:") + "\\"
+    try:
+        disk_free_gb = psutil.disk_usage(sys_root).free / 1_073_741_824
+    except OSError:
+        disk_free_gb = -1.0
+
+    # Pending reboot flag in the registry.
+    pending_reboot = False
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager",
+        )
+        winreg.QueryValueEx(key, "PendingFileRenameOperations")
+        winreg.CloseKey(key)
+        pending_reboot = True
+    except (OSError, FileNotFoundError):
+        pass
+
+    # Audit log writability.
+    audit = audit_log_path()
+    try:
+        audit.parent.mkdir(parents=True, exist_ok=True)
+        with audit.open("a", encoding="utf-8"):
+            pass
+        audit_ok = True
+    except OSError:
+        audit_ok = False
+
+    # Whether the configured Ollama model is pulled.
+    model_pulled: bool | None = None
+    if ollama_up:
+        pulled_models = client.list_models()
+        model_pulled = any(client.model in m for m in pulled_models)
+
     if output.json_enabled():
         output.emit({
             "administrator": admin,
             "winget": has_winget,
+            "disk_free_gb": round(disk_free_gb, 2),
+            "pending_reboot": pending_reboot,
+            "audit_log_writable": audit_ok,
             "ollama_model": client.model,
-            "ollama_reachable": ollama,
+            "ollama_reachable": ollama_up,
+            "ollama_model_pulled": model_pulled,
             "log_file": str(log_file()),
         })
         return
-    console.print(f"Administrator: {'[green]yes[/green]' if admin else '[yellow]no[/yellow] (some junk/uninstall actions need it)'}")
-    console.print(f"winget: {'[green]available[/green]' if has_winget else '[red]missing[/red]'}")
-    console.print(f"Ollama ({client.model}): {'[green]reachable[/green]' if ollama else '[yellow]not running[/yellow]'}")
-    console.print(f"Log file: [dim]{log_file()}[/dim]")
+
+    def _ok(v: bool) -> str:
+        return "[green]yes[/green]" if v else "[red]no[/red]"
+
+    console.print(f"Administrator:    {'[green]yes[/green]' if admin else '[yellow]no[/yellow] (some tasks need it)'}")
+    console.print(f"winget:           {'[green]available[/green]' if has_winget else '[red]missing[/red]'}")
+
+    if disk_free_gb < 0:
+        disk_str = "[yellow]unknown[/yellow]"
+    elif disk_free_gb < 10:
+        disk_str = f"[red]{disk_free_gb:.1f} GB free — low![/red]"
+    else:
+        disk_str = f"[green]{disk_free_gb:.1f} GB free[/green]"
+    console.print(f"System disk ({sys_root}): {disk_str}")
+
+    console.print(f"Pending reboot:   {'[yellow]yes — restart recommended[/yellow]' if pending_reboot else '[green]no[/green]'}")
+    console.print(f"Audit log:        {'[green]writable[/green]' if audit_ok else '[red]not writable[/red]'} [dim]({audit})[/dim]")
+
+    if ollama_up:
+        if model_pulled:
+            ollama_str = f"[green]reachable[/green], {client.model} [green]pulled[/green]"
+        else:
+            ollama_str = f"[green]reachable[/green], [yellow]{client.model} not pulled[/yellow] (run: ollama pull {client.model})"
+    else:
+        ollama_str = "[yellow]not running[/yellow]"
+    console.print(f"Ollama:           {ollama_str}")
+
+    console.print(f"Log file:         [dim]{log_file()}[/dim]")
 
 
 @app.command("logs")

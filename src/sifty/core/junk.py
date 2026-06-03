@@ -132,14 +132,17 @@ def clean(
     only: set[str] | None = None,
     *,
     dry_run: bool = True,
+    extra_protected: list[str] | None = None,
 ) -> CleanResult:
     """Trash the contents of selected junk categories.
 
     Returns a :class:`CleanResult`. ``trashed`` holds the original paths sent to
     the Recycle Bin (empty on a dry-run) — used to record an undoable session.
+    ``extra_protected`` extends the built-in denylist for this call only.
     """
     config = config or load_config()
-    extra_protected = config.section("safety").get("extra_protected_paths", [])
+    cfg_protected = config.section("safety").get("extra_protected_paths", [])
+    extra_protected = list(cfg_protected) + list(extra_protected or [])
     bytes_freed = 0
     items = 0
     skipped: list[str] = []
@@ -167,7 +170,7 @@ def clean(
                     trash(
                         entry,
                         allow_subtrees=[root],
-                        extra_protected=extra_protected,
+                        extra_protected=extra_protected,  # merged above
                         dry_run=dry_run,
                     )
                     bytes_freed += size

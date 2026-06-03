@@ -11,8 +11,16 @@ from sifty.core import cleanup, disk, safety
 def test_find_large_files_filters_and_sorts(tmp_path):
     (tmp_path / "big.bin").write_bytes(b"x" * 5000)
     (tmp_path / "small.bin").write_bytes(b"x" * 10)
-    result = cleanup.find_large_files(tmp_path, min_size=1000, top=10)
+    # recent_days=0 disables the recency filter so just-created test files appear.
+    result = cleanup.find_large_files(tmp_path, min_size=1000, top=10, recent_days=0)
     assert [p.name for p, _s in result] == ["big.bin"]
+
+
+def test_find_large_files_recent_filter(tmp_path):
+    """Files modified within recent_days are excluded from suggestions."""
+    (tmp_path / "new.bin").write_bytes(b"x" * 5000)
+    result = cleanup.find_large_files(tmp_path, min_size=1000, top=10, recent_days=7)
+    assert result == []  # recently created file is protected
 
 
 def test_choose_duplicate_deletions_keeps_one_per_group(tmp_path):
@@ -21,10 +29,22 @@ def test_choose_duplicate_deletions_keeps_one_per_group(tmp_path):
     a.write_text("same content")
     b.write_text("same content")
     groups = disk.find_duplicates(tmp_path, min_size=1)
-    to_delete = cleanup.choose_duplicate_deletions(groups)
+    # recent_days=0 disables recency filter; files created now would otherwise be skipped.
+    to_delete = cleanup.choose_duplicate_deletions(groups, recent_days=0)
     # Exactly one copy deleted, and it's the longer path (a.txt is kept).
     assert len(to_delete) == 1
     assert to_delete[0].name == "longer_name.txt"
+
+
+def test_choose_duplicate_deletions_recent_filter(tmp_path):
+    """Files modified within recent_days are not suggested for deletion."""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "longer_name.txt"
+    a.write_text("same content")
+    b.write_text("same content")
+    groups = disk.find_duplicates(tmp_path, min_size=1)
+    to_delete = cleanup.choose_duplicate_deletions(groups, recent_days=7)
+    assert to_delete == []  # recently created files are protected
 
 
 def test_find_stale_downloads(tmp_path):

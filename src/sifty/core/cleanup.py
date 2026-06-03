@@ -25,20 +25,34 @@ __all__ = [
 
 DEFAULT_LARGE_MIN = 100 * 1024 * 1024  # 100 MB
 DEFAULT_STALE_DAYS = 180
+DEFAULT_RECENT_DAYS = 7
 
 
-def find_large_files(path: Path, min_size: int = DEFAULT_LARGE_MIN, top: int = 50) -> list[tuple[Path, int]]:
-    """Return the largest files (>= ``min_size``) under ``path``, biggest first."""
+def find_large_files(
+    path: Path,
+    min_size: int = DEFAULT_LARGE_MIN,
+    top: int = 50,
+    recent_days: int = DEFAULT_RECENT_DAYS,
+) -> list[tuple[Path, int]]:
+    """Return the largest files (>= ``min_size``) under ``path``, biggest first.
+
+    Files modified within ``recent_days`` are excluded so actively-used files
+    never appear pre-selected for deletion. Pass ``recent_days=0`` to disable.
+    """
+    cutoff = time.time() - recent_days * 86400 if recent_days > 0 else None
     results: list[tuple[Path, int]] = []
     for root, _dirs, files in os.walk(path, onerror=lambda _e: None):
         for name in files:
             fp = Path(root) / name
             try:
-                size = fp.stat(follow_symlinks=False).st_size
+                st = fp.stat(follow_symlinks=False)
             except OSError:
                 continue
-            if size >= min_size:
-                results.append((fp, size))
+            if st.st_size < min_size:
+                continue
+            if cutoff is not None and st.st_mtime >= cutoff:
+                continue  # recently modified — skip
+            results.append((fp, st.st_size))
     results.sort(key=lambda t: t[1], reverse=True)
     return results[:top]
 
@@ -66,23 +80,45 @@ def find_stale_downloads(days: int = DEFAULT_STALE_DAYS, downloads: Path | None 
     return out
 
 
-def choose_duplicate_deletions(groups: dict[str, list[Path]]) -> list[Path]:
+def choose_duplicate_deletions(
+    groups: dict[str, list[Path]],
+    recent_days: int = DEFAULT_RECENT_DAYS,
+) -> list[Path]:
     """Keep one file per duplicate group, return the others (to delete).
 
     Keeps the shortest path (heuristic for the "original"); the rest are
-    redundant copies.
+    redundant copies. Files modified within ``recent_days`` are never suggested
+    for deletion. Pass ``recent_days=0`` to disable.
     """
+    cutoff = time.time() - recent_days * 86400 if recent_days > 0 else None
     to_delete: list[Path] = []
     for paths in groups.values():
         ordered = sorted(paths, key=lambda p: (len(str(p)), str(p)))
-        to_delete.extend(ordered[1:])  # keep ordered[0]
+        for p in ordered[1:]:
+            if cutoff is not None:
+                try:
+                    if p.stat(follow_symlinks=False).st_mtime >= cutoff:
+                        continue  # recently modified — skip
+                except OSError:
+                    pass
+            to_delete.append(p)
     return to_delete
 
 
-def trash_paths(paths, *, dry_run: bool = True, config=None) -> CleanResult:
-    """Send a chosen set of paths to the Recycle Bin via the safety layer."""
+def trash_paths(
+    paths,
+    *,
+    dry_run: bool = True,
+    config=None,
+    extra_protected: list[str] | None = None,
+) -> CleanResult:
+    """Send a chosen set of paths to the Recycle Bin via the safety layer.
+
+    ``extra_protected`` extends the built-in denylist for this call only.
+    """
     config = config or load_config()
-    extra_protected = config.section("safety").get("extra_protected_paths", [])
+    cfg_protected = config.section("safety").get("extra_protected_paths", [])
+    extra_protected = list(cfg_protected) + list(extra_protected or [])
     bytes_freed = 0
     items = 0
     skipped: list[str] = []
