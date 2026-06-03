@@ -4,17 +4,25 @@ from __future__ import annotations
 
 import logging
 
+from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, SelectionList, Static
+from textual.widgets import Button, DataTable, SelectionList, Static
 from textual.widgets.selection_list import Selection
 
 from ...core import optimize
 from ...windows.admin import is_admin
+from ..widgets import Panel
 from .base import BaseView
 
 logger = logging.getLogger("sifty.tui")
+
+# (icon, theme-hex-color) pairs for each row state
+_PENDING = ("·", "#9aa5ce")   # muted dot — not started yet
+_RUNNING = ("⟳", "#e0af68")   # yellow — in progress
+_OK      = ("✓", "#9ece6a")   # green  — succeeded
+_FAIL    = ("✗", "#f7768e")   # red    — failed
 
 
 class OptimizeView(BaseView):
@@ -28,13 +36,13 @@ class OptimizeView(BaseView):
         yield SelectionList(id="optimize-list")
         with Horizontal(classes="actions"):
             yield Button("Run selected", id="run", variant="primary")
-        yield Static("", id="optimize-log", classes="status")
+        yield Panel(DataTable(id="results-table"), title="Results", id="results-panel")
         yield Static("", id="optimize-status", classes="status")
 
     def on_mount(self) -> None:
         self._ops: list[optimize.OptimizeOp] = optimize.list_operations()
         self._admin = is_admin()
-        self._log_lines: list[str] = []
+
         sl = self.query_one("#optimize-list", SelectionList)
         for op in self._ops:
             if op.requires_admin and not self._admin:
@@ -43,40 +51,59 @@ class OptimizeView(BaseView):
             else:
                 label = f"{op.label}  [dim]· {op.reversible}[/dim]"
                 sl.add_option(Selection(label, op.key, initial_state=True))
+
+        table = self.query_one("#results-table", DataTable)
+        table.cursor_type = "none"
+        cols = table.add_columns(" ", "Operation", "Detail")
+        self._col_status, self._col_op, self._col_detail = cols
+
+        self.query_one("#results-panel").display = False
         self._set_status("Select operations and press Run selected.")
 
     def _set_status(self, msg: str) -> None:
         self.query_one("#optimize-status", Static).update(msg)
 
-    def _append_log(self, msg: str) -> None:
-        self._log_lines.append(msg)
-        self.query_one("#optimize-log", Static).update("\n".join(self._log_lines))
+    @staticmethod
+    def _cell(icon: str, color: str) -> Text:
+        return Text(icon, style=f"bold {color}")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "run":
-            keys = set(self.query_one("#optimize-list", SelectionList).selected)
-            if not keys:
-                self._set_status("Nothing selected.")
-                return
-            ops = [op for op in self._ops if op.key in keys]
-            self._log_lines = []
-            self.query_one("#optimize-log", Static).update("")
-            self._set_status("Running…")
-            self.query_one("#run", Button).disabled = True
-            self.run_ops(ops)
+        if event.button.id != "run":
+            return
+        keys = set(self.query_one("#optimize-list", SelectionList).selected)
+        if not keys:
+            self._set_status("Nothing selected.")
+            return
+        ops = [op for op in self._ops if op.key in keys]
+
+        table = self.query_one("#results-table", DataTable)
+        table.clear()
+        for op in ops:
+            icon, color = _PENDING
+            table.add_row(self._cell(icon, color), op.label, "Pending…", key=op.key)
+
+        self.query_one("#results-panel").display = True
+        self._set_status(f"Running {len(ops)} operation(s)…")
+        self.query_one("#run", Button).disabled = True
+        self.run_ops(ops)
 
     @work(thread=True, exclusive=True, group="optimize-run")
     def run_ops(self, ops: list[optimize.OptimizeOp]) -> None:
         for op in ops:
-            self.app.call_from_thread(self._append_log, f"  {op.label}…")
+            self.app.call_from_thread(self._update_row, op.key, _RUNNING, "Running…")
             try:
                 ok, msg = optimize.run_op(op, dry_run=False)
-                line = f"  [green]✓[/green] {op.label}: {msg}" if ok else f"  [red]✗[/red] {op.label}: {msg}"
+                self.app.call_from_thread(self._update_row, op.key, _OK if ok else _FAIL, msg)
             except Exception as exc:
                 logger.exception("Optimize op %s failed", op.key)
-                line = f"  [red]✗[/red] {op.label}: {exc}"
-            self.app.call_from_thread(self._append_log, line)
+                self.app.call_from_thread(self._update_row, op.key, _FAIL, str(exc))
         self.app.call_from_thread(self._done)
+
+    def _update_row(self, row_key: str, status: tuple[str, str], detail: str) -> None:
+        icon, color = status
+        table = self.query_one("#results-table", DataTable)
+        table.update_cell(row_key, self._col_status, self._cell(icon, color))
+        table.update_cell(row_key, self._col_detail, detail)
 
     def _done(self) -> None:
         self.query_one("#run", Button).disabled = False
