@@ -54,8 +54,9 @@ class OptimizeView(BaseView):
 
         table = self.query_one("#results-table", DataTable)
         table.cursor_type = "none"
-        cols = table.add_columns(" ", "Operation", "Detail")
-        self._col_status, self._col_op, self._col_detail = cols
+        self._col_status = table.add_column(" ", width=3)
+        self._col_op     = table.add_column("Operation", width=36)
+        self._col_detail = table.add_column("Detail", width=50)
 
         self.query_one("#results-panel").display = False
         self._set_status("Select operations and press Run selected.")
@@ -107,4 +108,4 @@ class OptimizeView(BaseView):
 
     def _done(self) -> None:
         self.query_one("#run", Button).disabled = False
-        self._set_status("Done.")
+        self._set_status("")
