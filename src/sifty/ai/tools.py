@@ -195,6 +195,44 @@ def _handler_toggle_startup(args: dict) -> ToolResult:
     )
 
 
+def _handler_schedule_maintenance(args: dict) -> ToolResult:
+    from ..core import schedule
+    name = args.get("name", "sifty-auto")
+    profile = args.get("profile", "")
+    frequency = (args.get("frequency") or "DAILY").upper()
+    day = (args.get("day") or "MON").upper()
+    time_str = args.get("time", "03:00")
+    if not profile:
+        return ToolResult(summary="Cannot schedule: no profile name provided. "
+                          "Ask the user which profile to use (see sifty profile list).")
+    command = schedule.sifty_command(profile)
+    ok, msg = schedule.add(name, profile, command, sc=frequency, day=day, time=time_str)
+    if ok:
+        when = f"{frequency.title()} {day} at {time_str}" if frequency == "WEEKLY" else f"Daily at {time_str}"
+        return ToolResult(
+            summary=f"Scheduled '{name}' to run profile '{profile}' {when}. "
+                    f"Use `sifty schedule list` to confirm."
+        )
+    return ToolResult(summary=f"Failed to create scheduled task: {msg}")
+
+
+def _handler_prune_worktrees(args: dict) -> ToolResult:
+    from ..core.vcs import find_orphan_worktrees, prune_worktrees
+    raw = args.get("path", "")
+    path = Path(raw).expanduser()
+    if not path.exists():
+        return ToolResult(summary=f"Path does not exist: {path}")
+    orphans = find_orphan_worktrees(path)
+    if not orphans:
+        return ToolResult(summary=f"No orphaned worktrees found in {path}.")
+    result = prune_worktrees(path, dry_run=False)
+    return ToolResult(
+        summary=f"Pruned {result.items} orphaned worktree(s) ({human_size(result.bytes_freed)}) "
+                f"from {path}. Directories sent to Recycle Bin."
+                + (f" {len(result.skipped)} skipped." if result.skipped else "")
+    )
+
+
 def _handler_find_orphan_apps(_args: dict) -> ToolResult:
     from ..core.registry_scan import find_orphan_uninstall_entries
     entries = find_orphan_uninstall_entries()
@@ -423,6 +461,36 @@ TOOLS: list[Tool] = [
         parameters={"type": "object", "properties": {}, "required": []},
         risk="read",
         handler=_handler_system_status,
+    ),
+    Tool(
+        name="schedule_maintenance",
+        description="Schedule a recurring automatic cleanup. Use when the user asks to automate or schedule a cleanup. Extract the schedule from their request and provide the profile name.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Short name for the task, e.g. 'weekly-cleanup'"},
+                "profile": {"type": "string", "description": "Cleanup profile name to run (use list_profiles first if unsure)"},
+                "frequency": {"type": "string", "enum": ["DAILY", "WEEKLY"], "description": "DAILY or WEEKLY"},
+                "day": {"type": "string", "description": "Day of week for WEEKLY schedules: MON TUE WED THU FRI SAT SUN"},
+                "time": {"type": "string", "description": "Time in HH:MM 24h format, e.g. '03:00'"},
+            },
+            "required": ["name", "profile", "frequency", "time"],
+        },
+        risk="low",
+        handler=_handler_schedule_maintenance,
+    ),
+    Tool(
+        name="prune_worktrees",
+        description="Find and remove orphaned git worktrees left by AI coding agents (Claude Code, Cursor, etc.) in a repository.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Git repository root path to inspect"}
+            },
+            "required": ["path"],
+        },
+        risk="high",
+        handler=_handler_prune_worktrees,
     ),
     Tool(
         name="find_orphan_apps",

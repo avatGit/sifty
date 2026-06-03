@@ -159,6 +159,38 @@ def version_cmd() -> None:
     console.print(f"Sifty {__version__}")
 
 
+@app.command("selfupdate")
+def selfupdate_cmd(
+    check_only: bool = typer.Option(False, "--check", help="Only check for updates, do not upgrade."),
+) -> None:
+    """Check PyPI for a newer Sifty version and upgrade via pipx."""
+    from ..core.selfupdate import apply_update, check_update
+
+    with console.status("Checking PyPI for updates…"):
+        current, latest = check_update()
+
+    if output.json_enabled():
+        output.emit({"current": current, "latest": latest, "update_available": latest is not None})
+        return
+
+    if latest is None:
+        success(f"Sifty {current} is already the latest version.")
+        return
+
+    console.print(f"Update available: [dim]{current}[/dim] → [bold cyan]{latest}[/bold cyan]")
+    if check_only:
+        console.print("[dim]Run [cyan]sifty selfupdate[/cyan] without --check to apply.[/dim]")
+        return
+
+    with console.status(f"Upgrading to {latest} via pipx…"):
+        ok, msg = apply_update()
+    if ok:
+        success(f"Upgraded to {latest}. {msg}")
+    else:
+        error(f"Upgrade failed: {msg}")
+        raise typer.Exit(1)
+
+
 @app.command("doctor")
 def doctor_cmd() -> None:
     """Report environment readiness: admin, winget, Ollama, disk, reboot state."""

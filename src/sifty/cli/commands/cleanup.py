@@ -127,6 +127,50 @@ def stale_cmd(
     success(f"Sent {result.items} items ({human_size(result.bytes_freed)}) to the Recycle Bin.")
 
 
+@app.command("worktrees")
+def worktrees_cmd(
+    path: Path = typer.Argument(..., help="Git repository root to inspect."),
+    apply: bool = typer.Option(False, "--apply", help="Prune git metadata and trash orphaned dirs."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+) -> None:
+    """Find and remove orphaned git worktrees left by AI coding agents."""
+    from ...core.vcs import find_orphan_worktrees, prune_worktrees
+
+    path = path.expanduser()
+    if not path.exists():
+        warn(f"Path does not exist: {path}")
+        raise typer.Exit(1)
+
+    with console.status(f"Scanning worktrees in {path}…") if not output.json_enabled() else _null():
+        orphans = find_orphan_worktrees(path)
+
+    if output.json_enabled():
+        output.emit([{"path": str(o.path), "head": o.head, "reason": o.reason} for o in orphans])
+        return
+
+    if not orphans:
+        success("No orphaned worktrees found.")
+        return
+
+    table = Table(title=f"Orphaned worktrees in {path}")
+    table.add_column("Path")
+    table.add_column("HEAD", style="dim")
+    table.add_column("Reason", style="dim")
+    for o in orphans:
+        table.add_row(str(o.path), o.head, o.reason)
+    console.print(table)
+
+    if not apply:
+        console.print("[dim]Dry-run — re-run with --apply to prune and trash them.[/dim]")
+        return
+    if not confirm(f"Prune {len(orphans)} orphaned worktree(s)?", assume_yes=yes):
+        warn("Cancelled.")
+        return
+    result = prune_worktrees(path, dry_run=False)
+    history.record_clean("cleanup-worktrees", str(path), result.bytes_freed, result.items, result.trashed)
+    success(f"Pruned {result.items} worktree(s) ({human_size(result.bytes_freed)}).")
+
+
 class _null:
     """No-op context manager (used to skip the status spinner in JSON mode)."""
 

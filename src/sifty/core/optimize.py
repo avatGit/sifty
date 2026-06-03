@@ -71,6 +71,14 @@ def list_operations() -> list[OptimizeOp]:
             "not reversible",
             requires_admin=True,
         ),
+        OptimizeOp(
+            "compact-vhd",
+            "Compact virtual hard disks",
+            "Reclaim unused space inside Hyper-V / WSL2 .vhdx files without "
+            "touching their contents. Requires DISM and administrator rights.",
+            "non-destructive",
+            requires_admin=True,
+        ),
     ]
 
 
@@ -98,6 +106,19 @@ def run_op(op: OptimizeOp, *, dry_run: bool = True) -> tuple[bool, str]:
             op,
             timeout=600,
         )
+
+    if op.key == "compact-vhd":
+        from ..windows.hyperv import list_vhdx_files, compact_vhdx
+        vhds = list_vhdx_files()
+        if not vhds:
+            return True, "no .vhdx files found"
+        ok_count = 0
+        for path, _ in vhds:
+            ok, _ = compact_vhdx(path)
+            if ok:
+                ok_count += 1
+        audit(f"OPTIMIZE {op.key}: compacted {ok_count}/{len(vhds)} VHD(s)")
+        return True, f"{ok_count}/{len(vhds)} VHD(s) compacted"
 
     return False, f"Unknown operation: {op.key}"
 

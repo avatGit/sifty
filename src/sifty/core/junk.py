@@ -9,6 +9,7 @@ the directory sits inside a protected root (e.g. ``C:\\Windows\\Temp``).
 from __future__ import annotations
 
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -220,6 +221,29 @@ def _downloads_installer_filter(path: Path) -> bool:
     return path.suffix.lower() in {".exe", ".msi"}
 
 
+# Common suffix patterns stripped before matching an installer filename to an app name.
+_INSTALLER_SUFFIXES = re.compile(
+    r"[_\-\s]*(setup|installer|install|_x64|_x86|_amd64|_win|_win64|"
+    r"_windows|portable|\d+[\.\d]*)$",
+    re.IGNORECASE,
+)
+
+
+def _installer_app_hint(path: Path) -> str:
+    """Extract a normalised app-name hint from an installer filename."""
+    stem = path.stem
+    stem = _INSTALLER_SUFFIXES.sub("", stem).strip()
+    return stem.lower().replace("-", " ").replace("_", " ")
+
+
+def _is_installed_app_installer(path: Path, installed_names: frozenset[str]) -> bool:
+    """Return True if ``path`` looks like an installer for an already-installed app."""
+    hint = _installer_app_hint(path)
+    if len(hint) < 3:
+        return False
+    return any(hint in name or name in hint for name in installed_names)
+
+
 def _event_log_archive_filter(path: Path) -> bool:
     return path.name.startswith("Archive-") and path.suffix.lower() == ".evtx"
 
@@ -245,6 +269,15 @@ def clean(
     skipped: list[str] = []
     trashed: list[Path] = []
 
+    # Build installed-app name set once for smart installer matching.
+    _installed_names: frozenset[str] | None = None
+    if config.section("junk").get("include_downloads_installers"):
+        try:
+            from .apps import installed_apps
+            _installed_names = frozenset(a.name.lower() for a in installed_apps())
+        except Exception:
+            _installed_names = frozenset()
+
     for cat_scan in scan(config, only):
         cat = cat_scan.category
         for root in cat_scan.existing_roots:
@@ -257,6 +290,14 @@ def clean(
             for entry in entries:
                 if cat.file_filter is not None and not (
                     entry.is_file() and cat.file_filter(entry)
+                ):
+                    continue
+                # Smart installer check: only flag installers for apps that are
+                # already installed (conservative — skip if we can't match).
+                if (
+                    cat.key == "downloads-installers"
+                    and _installed_names is not None
+                    and not _is_installed_app_installer(entry, _installed_names)
                 ):
                     continue
                 try:

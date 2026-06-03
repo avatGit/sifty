@@ -11,7 +11,7 @@ from sifty.core import optimize
 def test_list_operations_returns_all():
     ops = optimize.list_operations()
     keys = {op.key for op in ops}
-    assert {"dns-flush", "thumbnail-cache", "prefetch", "update-cache", "dism-cleanup"} == keys
+    assert {"dns-flush", "thumbnail-cache", "prefetch", "update-cache", "dism-cleanup", "compact-vhd"} == keys
 
 
 def test_run_op_dry_run_never_calls_subprocess():
