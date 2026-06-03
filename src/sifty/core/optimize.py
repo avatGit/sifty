@@ -11,8 +11,10 @@ file deletions, so there is a record of what ran and when.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 from .safety import audit
 
@@ -84,8 +86,7 @@ def run_op(op: OptimizeOp, *, dry_run: bool = True) -> tuple[bool, str]:
         return _clean_junk_category("thumbnail-cache", op)
 
     if op.key == "prefetch":
-        sys_root = os.environ.get("SystemRoot", r"C:\Windows")
-        prefetch = __import__("pathlib").Path(sys_root) / "Prefetch"
+        prefetch = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "Prefetch"
         return _delete_dir_contents(prefetch, op)
 
     if op.key == "update-cache":
@@ -104,6 +105,22 @@ def run_op(op: OptimizeOp, *, dry_run: bool = True) -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 # helpers
 
+_PROGRESS_BAR = re.compile(r"^\[=+.*%.*\]$")
+
+
+def _clean_output(raw: str) -> str:
+    """Return the last meaningful line from subprocess output.
+
+    Strips blank lines, DISM-style progress bars ([===65%===]), and
+    version/header lines so the TUI and CLI show a single readable result.
+    """
+    lines = [
+        l.strip() for l in raw.splitlines()
+        if l.strip() and not _PROGRESS_BAR.match(l.strip())
+    ]
+    return lines[-1] if lines else ""
+
+
 def _run_subprocess(
     cmd: list[str],
     op: OptimizeOp,
@@ -119,10 +136,11 @@ def _run_subprocess(
             timeout=timeout,
         )
         ok = result.returncode == 0
-        msg = (result.stdout or result.stderr or "").strip()
+        raw = (result.stdout or result.stderr or "").strip()
+        msg = _clean_output(raw) or ("ok" if ok else f"exit {result.returncode}")
         if ok:
-            audit(f"OPTIMIZE {op.key}: {msg or 'ok'}")
-        return ok, msg or ("ok" if ok else f"exit {result.returncode}")
+            audit(f"OPTIMIZE {op.key}: {msg}")
+        return ok, msg
     except FileNotFoundError:
         return False, f"Command not found: {cmd[0]}"
     except subprocess.TimeoutExpired:
@@ -142,9 +160,25 @@ def _clean_junk_category(key: str, op: OptimizeOp) -> tuple[bool, str]:
     return True, msg
 
 
+def _entry_bytes(entry) -> int:
+    """Return the byte size of a file or directory without raising."""
+    try:
+        if entry.is_dir():
+            total = 0
+            for root, _dirs, files in os.walk(entry, onerror=lambda _e: None):
+                for name in files:
+                    try:
+                        total += (entry.__class__(root) / name).stat(follow_symlinks=False).st_size
+                    except OSError:
+                        pass
+            return total
+        return entry.stat(follow_symlinks=False).st_size
+    except OSError:
+        return 0
+
+
 def _delete_dir_contents(path, op: OptimizeOp) -> tuple[bool, str]:
     """Delete all direct children of path via the safety layer."""
-    from .junk import _dir_size
     from .safety import ProtectedPathError, trash
     if not path.exists():
         return True, "directory not found (nothing to do)"
@@ -157,7 +191,7 @@ def _delete_dir_contents(path, op: OptimizeOp) -> tuple[bool, str]:
         return False, str(exc)
     for entry in entries:
         try:
-            size = _dir_size(entry) if entry.is_dir() else entry.stat().st_size
+            size = _entry_bytes(entry)
             trash(entry, allow_subtrees=[path], dry_run=False)
             freed += size
             count += 1
