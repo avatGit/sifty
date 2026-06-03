@@ -34,6 +34,7 @@ class OptimizeView(BaseView):
     def on_mount(self) -> None:
         self._ops: list[optimize.OptimizeOp] = optimize.list_operations()
         self._admin = is_admin()
+        self._log_lines: list[str] = []
         sl = self.query_one("#optimize-list", SelectionList)
         for op in self._ops:
             if op.requires_admin and not self._admin:
@@ -48,9 +49,8 @@ class OptimizeView(BaseView):
         self.query_one("#optimize-status", Static).update(msg)
 
     def _append_log(self, msg: str) -> None:
-        log_widget = self.query_one("#optimize-log", Static)
-        current = str(log_widget.renderable)
-        log_widget.update((current + "\n" + msg).strip())
+        self._log_lines.append(msg)
+        self.query_one("#optimize-log", Static).update("\n".join(self._log_lines))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "run":
@@ -59,6 +59,7 @@ class OptimizeView(BaseView):
                 self._set_status("Nothing selected.")
                 return
             ops = [op for op in self._ops if op.key in keys]
+            self._log_lines = []
             self.query_one("#optimize-log", Static).update("")
             self._set_status("Running…")
             self.query_one("#run", Button).disabled = True
