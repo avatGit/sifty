@@ -5,9 +5,9 @@ steps, and tool-result tables all render in place as they arrive.
 
 What this view wires together:
 - **Agentic loop** (:mod:`sifty.ai.agent`): tool calls + results stream in live;
-  destructive tools pause for approval via a :class:`ConfirmModal`.
+  tools that need approval render **inline Run/Skip buttons in the chat** (no
+  modal) so the AI's proposal reads like a suggestion the user can accept.
 - **Autonomy** dropdown (ask / low_risk_auto / full_auto), persisted immediately.
-- **Quick actions**: one-tap buttons that send common requests.
 - **Memory**: the conversation persists on the app, so leaving the screen and
   coming back keeps the history; the model also sees prior turns each request.
 - **Context**: a metadata-only machine snapshot is built in the worker (never on
@@ -43,7 +43,6 @@ from ...ai.agent import (
 )
 from ...ai.client import OllamaClient, OllamaUnavailable
 from ...ai.tools import TOOLS as ALL_TOOLS
-from ..modals import ConfirmModal
 from .base import BaseView
 
 logger = logging.getLogger("sifty.tui")
@@ -53,13 +52,6 @@ _AUTONOMY_OPTIONS = [
     ("Auto low-risk", "low_risk_auto"),
     ("Full auto", "full_auto"),
 ]
-
-# Quick-action button id -> the request it sends.
-_QUICK_ACTIONS = {
-    "qa-scan": ("Scan junk", "Scan for junk files and tell me what's safe to remove."),
-    "qa-big": ("Big files", "Show me the largest files in my Downloads folder."),
-    "qa-updates": ("Check updates", "What apps have updates available?"),
-}
 
 _RISK_COLOR = {"read": "cyan", "low": "yellow", "high": "red"}
 
@@ -90,9 +82,6 @@ class AIView(BaseView):
                 value=current_autonomy(), allow_blank=False,
             )
         yield VerticalScroll(id="chat-log")
-        with Horizontal(id="ai-quick"):
-            for btn_id, (label, _prompt) in _QUICK_ACTIONS.items():
-                yield Button(label, id=btn_id, classes="quick")
         yield Input(
             placeholder="Ask about cleanup, disk usage, safety…  (Enter to send)",
             id="ask",
@@ -103,6 +92,8 @@ class AIView(BaseView):
         self._online = False
         self._live: Static | None = None       # in-progress streaming reply
         self._thinking: Static | None = None    # "Sifty is thinking…" placeholder
+        # In-flight inline approval: (worker wake event, result holder, chat row).
+        self._pending: tuple[threading.Event, dict, Horizontal] | None = None
         self._autonomy = current_autonomy()
         # Conversation + context persist on the app, surviving navigation.
         self._messages: list[dict] = getattr(self.app, "_ai_messages", None) or []
@@ -143,9 +134,8 @@ class AIView(BaseView):
         self._submit(event.value)
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
-        action = _QUICK_ACTIONS.get(event.button.id or "")
-        if action:
-            self._submit(action[1])
+        if event.button.has_class("approve") or event.button.has_class("deny"):
+            self._resolve_approval(approved=event.button.has_class("approve"))
             return
         nav_key = getattr(event.button, "_nav_key", None)
         if nav_key:  # a tool-result follow-up action — jump to the screen
@@ -219,19 +209,49 @@ class AIView(BaseView):
         return "".join(parts).strip()
 
     def _confirm_blocking(self, prompt: str) -> bool:
-        """Ask the user to approve a tool from the worker thread (blocks until answered)."""
+        """Ask the user to approve a tool from the worker thread (blocks until answered).
+
+        Renders inline Run/Skip buttons in the chat — the AI's proposal reads
+        like a suggestion the user accepts in place, not a modal interruption.
+        """
         done = threading.Event()
         holder = {"ok": False}
-
-        def ask_ui() -> None:
-            def on_close(result: bool | None) -> None:
-                holder["ok"] = bool(result)
-                done.set()
-            self.app.push_screen(ConfirmModal(prompt, confirm_label="Proceed"), on_close)
-
-        self.app.call_from_thread(ask_ui)
+        self.app.call_from_thread(self._mount_approval, prompt, done, holder)
         done.wait()
         return holder["ok"]
+
+    def _mount_approval(self, prompt: str, done: threading.Event, holder: dict) -> None:
+        row = Horizontal(classes="approval-row")
+        row._prompt = prompt
+        self._pending = (done, holder, row)
+        self._remove_thinking()
+        log = self._log()
+        log.mount(row)
+        row.mount(Static(f"[b]?[/b] {escape(prompt)}", classes="approval-text"))
+        row.mount(Button("Run", variant="warning", classes="approve"))
+        row.mount(Button("Skip", classes="deny"))
+        log.scroll_end(animate=False)
+
+    def _resolve_approval(self, *, approved: bool) -> None:
+        if self._pending is None:
+            return
+        done, holder, row = self._pending
+        self._pending = None
+        holder["ok"] = approved
+        verdict = "[green]✓ approved[/green]" if approved else "[dim]✗ skipped[/dim]"
+        prompt = getattr(row, "_prompt", "")
+        self._log().mount(Static(f"{verdict} [dim]{escape(prompt)}[/dim]", classes="msg-tool"))
+        row.remove()
+        done.set()  # wake the agent worker
+
+    def on_unmount(self) -> None:
+        # Navigating away with an approval pending: deny it (no widget work —
+        # the view is going away) so the agent worker doesn't block forever.
+        if self._pending is not None:
+            done, holder, _row = self._pending
+            self._pending = None
+            holder["ok"] = False
+            done.set()
 
     def _remember(self, answer: str) -> None:
         if answer:

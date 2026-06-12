@@ -389,14 +389,56 @@ async def test_junk_clean_opens_confirm_in_worker():
         assert not isinstance(pilot.app.screen, ConfirmModal)
 
 
-async def test_ai_view_has_autonomy_and_quick_actions():
+async def test_ai_view_has_autonomy_and_no_quick_buttons():
     async with _make_app().run_test() as pilot:
         await pilot.app.show("ai")
         await pilot.pause()
         select = pilot.app.query_one("#autonomy", Select)
         assert select.value in ("ask", "low_risk_auto", "full_auto")
-        # Quick-action buttons are present.
-        assert len(pilot.app.query(".quick")) == 3
+        # The old quick-action button row is gone (it overlapped the chat box).
+        assert len(pilot.app.query(".quick")) == 0
+
+
+async def test_ai_inline_approval_run_and_skip():
+    import threading
+
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("ai")
+        await pilot.pause()
+        view = pilot.app.query_one(AIView)
+
+        # Approve: the worker-side holder flips to True and the row collapses.
+        done, holder = threading.Event(), {"ok": False}
+        view._mount_approval("Run optimize_system() — risk: low", done, holder)
+        await pilot.pause()
+        assert len(pilot.app.query(".approval-row")) == 1
+        await pilot.click(".approve")
+        await pilot.pause()
+        assert done.is_set() and holder["ok"] is True
+        assert len(pilot.app.query(".approval-row")) == 0
+
+        # Skip: holder stays False.
+        done2, holder2 = threading.Event(), {"ok": False}
+        view._mount_approval("Run clean_junk() — risk: high", done2, holder2)
+        await pilot.pause()
+        await pilot.click(".deny")
+        await pilot.pause()
+        assert done2.is_set() and holder2["ok"] is False
+
+
+async def test_ai_pending_approval_denied_on_unmount():
+    import threading
+
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("ai")
+        await pilot.pause()
+        view = pilot.app.query_one(AIView)
+        done, holder = threading.Event(), {"ok": False}
+        view._mount_approval("Run clean_junk() — risk: high", done, holder)
+        await pilot.pause()
+        await pilot.app.show("home")  # navigate away with the approval pending
+        await pilot.pause()
+        assert done.is_set() and holder["ok"] is False  # worker not stuck
 
 
 async def test_ai_view_replays_stored_conversation():

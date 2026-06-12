@@ -209,8 +209,10 @@ Tree {
 #ai-controls .ctl-label { padding: 1 1 0 0; color: $text-muted; width: auto; }
 #ai-controls Select { width: 30; }
 
-#ai-quick { height: auto; margin-bottom: 1; }
-#ai-quick .quick { margin-right: 1; }
+/* Inline tool-approval row inside the chat log. */
+#chat-log .approval-row { height: auto; margin-bottom: 1; }
+#chat-log .approval-text { width: 1fr; padding: 1 1 0 0; color: $warning; }
+#chat-log .approval-row Button { margin-left: 1; min-width: 8; }
 
 #ask {
     margin-top: 1;
