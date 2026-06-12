@@ -1,0 +1,54 @@
+name: Release
+
+# Fires when you publish a GitHub Release (from a tag like v0.6.0).
+# Publishes the package to PyPI via Trusted Publishing (OIDC — no API token
+# stored anywhere) and attaches a standalone sifty.exe to the release.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write          # attach the exe to the release
+
+jobs:
+  pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi       # must match the PyPI trusted-publisher config
+    permissions:
+      id-token: write       # OIDC token for Trusted Publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  windows-exe:
+    name: Build Windows exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install + PyInstaller
+        run: |
+          python -m pip install -e .
+          python -m pip install pyinstaller
+      - name: Build sifty.exe
+        run: >
+          pyinstaller --onefile --name sifty --paths src --console
+          --collect-submodules win32com --hidden-import win32timezone
+          src/sifty/__main__.py
+      - name: Smoke-test the exe
+        run: ./dist/sifty.exe version
+      - name: Attach exe to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.event.release.tag_name }} dist/sifty.exe --clobber
