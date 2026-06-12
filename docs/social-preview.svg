@@ -1,11 +1,11 @@
-<!-- Social-preview banner (1280x640). Embeds docs/logo.png by relative path, so
-     render it via a headless browser with the SVG inlined in HTML (GitHub shows
-     the rendered docs/social-preview.png, not this source). -->
+<!-- Social-preview banner (1280x640). Embeds docs/logo-no-bg.png (transparent
+     icon) by relative path; re-render to docs/social-preview.png with headless
+     Chrome screenshotting this file at a 1280x640 window. -->
 <svg width="1280" height="640" viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sifty — sift the junk from the keep">
   <rect x="0" y="0" width="1280" height="640" fill="#14181F"/>
 
-  <!-- app icon -->
-  <image href="logo.png" x="220" y="170" width="300" height="300"/>
+  <!-- icon (transparent, floats on the banner — content bbox sized to sit at ~370,320) -->
+  <image href="logo-no-bg.png" x="155" y="119" width="428" height="428"/>
 
   <!-- wordmark -->
   <text x="570" y="348" font-family="'Cascadia Code','JetBrains Mono',Consolas,'SF Mono',ui-monospace,monospace"
