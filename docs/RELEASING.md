@@ -61,6 +61,14 @@ sifty version          # should match the tag
 The exe appears under the release's "Assets". `sifty selfupdate` compares the
 installed version against PyPI and upgrades via pipx.
 
+## Community installers (winget / scoop)
+
+After a release publishes and `sifty.exe` is attached, finalize the manifests
+in [`packaging/`](../packaging/README.md): fill in the exe's SHA256, then
+submit the winget manifests to microsoft/winget-pkgs and/or publish the scoop
+manifest. These must happen *after* the release because they reference the
+exe's URL and hash.
+
 ## Manual build (local, for testing)
 
 ```powershell
