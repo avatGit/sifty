@@ -286,6 +286,46 @@ def doctor_cmd() -> None:
     console.print(f"Log file:         [dim]{log_file()}[/dim]")
 
 
+@app.command("checkup")
+def checkup_cmd() -> None:
+    """Run every read-only health check (junk, updates, orphans, stale files, disk, startup)."""
+    from rich.table import Table
+
+    from ..core.checkup import run_checkup
+
+    with console.status("Running checkup…"):
+        findings = run_checkup()
+
+    if output.json_enabled():
+        output.emit([
+            {"domain": f.domain, "label": f.label, "summary": f.summary,
+             "severity": f.severity, "action": f.action_key}
+            for f in findings
+        ])
+        return
+
+    dot = {"ok": "[green]●[/green]", "info": "[yellow]●[/yellow]", "attention": "[red]●[/red]"}
+    hint = {
+        "junk": "sifty junk clean", "updates": "sifty update apply",
+        "apps": "sifty apps orphans", "cleanup": "sifty cleanup stale",
+        "clean": "sifty junk clean", "startup": "sifty startup list",
+    }
+    table = Table(title="Checkup")
+    table.add_column("")
+    table.add_column("Check")
+    table.add_column("Result")
+    table.add_column("Next step", style="dim")
+    for f in findings:
+        table.add_row(dot[f.severity], f.label, f.summary,
+                      hint.get(f.action_key, "") if f.severity != "ok" else "")
+    console.print(table)
+    issues = sum(1 for f in findings if f.severity != "ok")
+    if issues:
+        console.print(f"[bold]{issues}[/bold] item(s) worth a look — checkup never changes anything itself.")
+    else:
+        success("All clear — nothing needs attention.")
+
+
 @app.command("logs")
 def logs_cmd(
     tail: int = typer.Option(40, "--tail", "-n", help="Show the last N lines."),
