@@ -1,0 +1,60 @@
+name: Bug report
+description: Something broke or behaved wrong.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead.
+      placeholder: I ran a junk clean and ...
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Exact command
+      placeholder: sifty junk clean --apply
+    validations:
+      required: true
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Run `winver` if unsure.
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How did you install Sifty?
+      options:
+        - pipx / pip
+        - Standalone exe
+        - Scoop
+        - winget
+        - From source
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Sifty version
+      description: Output of `sifty version`.
+      placeholder: 0.6.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log tail
+      description: Paste the output of `sifty logs --tail 30`. Check it first and strip any paths you'd rather keep private.
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I checked the pasted logs for private paths or names.
+          required: true

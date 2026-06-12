@@ -1,0 +1,37 @@
+name: Feature request
+description: An idea for something Sifty should do.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: What are you trying to do that Sifty doesn't handle today.
+      placeholder: My machine accumulates X and I have to clean it by hand ...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+      placeholder: A `sifty ...` command that ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Sifty?
+      options:
+        - Junk cleaning
+        - Disk / duplicates
+        - Apps / updates
+        - Startup / services
+        - Organize
+        - TUI
+        - AI assistant
+        - Other / not sure
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: Safety considerations, prior art in other tools, and so on.
