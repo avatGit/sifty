@@ -21,14 +21,21 @@ from sifty.tui.modals import ConfirmModal
 from sifty.core.models import StartupEntry
 from sifty.tui.views import (
     AIView,
+    AppsSystemView,
     AppsView,
     CleanupView,
+    CleanView,
     DiskView,
     HomeView,
     JunkView,
+    MonitorView,
+    OptimizeView,
+    PurgeView,
     ReportsView,
     ServicesView,
     StartupView,
+    SUBVIEW_LABELS,
+    SUBVIEW_ROUTES,
     UpdatesView,
     VIEWS,
 )
@@ -50,8 +57,11 @@ def test_command_palette_entries_cover_sections_and_admin():
     entries = _entries(_Dummy())
     titles = [t for t, _h, _c in entries]
     assert "Go to Home" in titles
+    # Consolidated sub-screens stay directly reachable via deep-link entries.
+    assert "Go to Junk" in titles
+    assert "Go to Startup" in titles
     assert "Restart as administrator" in titles
-    assert len(entries) == len(SECTIONS) + 1
+    assert len(entries) == len(SECTIONS) + len(SUBVIEW_LABELS) + 1
 
 
 async def test_home_has_individual_stat_blocks():
@@ -82,12 +92,49 @@ async def test_home_renders_volume_gauges():
         assert "free" in str(body.render())  # at least one volume rendered
 
 
+# nav key -> the concrete view class that should end up mounted after show().
+_NAV_EXPECT = {
+    "junk": JunkView,
+    "purge": PurgeView,
+    "optimize": OptimizeView,
+    "cleanup": CleanupView,
+    "startup": StartupView,
+    "services": ServicesView,
+}
+
+
 async def test_navigation_mounts_each_view():
     async with _make_app().run_test() as pilot:
+        # Top-level sections mount their group/standalone view directly.
         for key, view_cls in VIEWS.items():
             await pilot.app.show(key)
             await pilot.pause()
+            await pilot.pause()
             assert pilot.app.query_one(view_cls)
+        # Deep-link keys mount their group and lazily mount the tab's sub-view.
+        for key, view_cls in _NAV_EXPECT.items():
+            await pilot.app.show(key)
+            await pilot.pause()
+            await pilot.pause()
+            assert pilot.app.query_one(view_cls)
+
+
+async def test_clean_group_lazily_mounts_only_active_tab():
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("clean")
+        await pilot.pause()
+        await pilot.pause()
+        group = pilot.app.query_one(CleanView)
+        # Only the first tab's view is instantiated; the rest stay dormant.
+        assert pilot.app.query(JunkView)
+        assert not pilot.app.query(PurgeView)
+        assert not pilot.app.query(OptimizeView)
+        assert not pilot.app.query(CleanupView)
+        # Switching tabs mounts the requested sub-view on demand.
+        group.activate_tab("purge")
+        await pilot.pause()
+        await pilot.pause()
+        assert pilot.app.query(PurgeView)
 
 
 async def test_junk_view_populates_selection_list():
@@ -97,6 +144,7 @@ async def test_junk_view_populates_selection_list():
     ]
     async with _make_app().run_test() as pilot:
         await pilot.app.show("junk")
+        await pilot.pause()
         await pilot.pause()
         view = pilot.app.query_one(JunkView)
         view._populate(cats)
@@ -112,6 +160,7 @@ async def test_apps_view_populates_table():
     async with _make_app().run_test() as pilot:
         await pilot.app.show("apps")
         await pilot.pause()
+        await pilot.pause()
         view = pilot.app.query_one(AppsView)
         view._populate(apps)
         table = pilot.app.query_one("#apps-table", DataTable)
@@ -126,6 +175,7 @@ async def test_apps_filter_narrows_and_marking_selects():
     ]
     async with _make_app().run_test() as pilot:
         await pilot.app.show("apps")
+        await pilot.pause()
         await pilot.pause()
         view = pilot.app.query_one(AppsView)
         view._populate(apps)
@@ -152,6 +202,7 @@ async def test_apps_row_click_toggles_mark():
     async with _make_app().run_test() as pilot:
         await pilot.app.show("apps")
         await pilot.pause()
+        await pilot.pause()
         view = pilot.app.query_one(AppsView)
         view._populate(apps)
         await pilot.pause()
@@ -165,6 +216,7 @@ async def test_cleanup_view_populates_and_marks():
     rows = [(Path("C:/a.bin"), 100), (Path("C:/b.bin"), 200)]
     async with _make_app().run_test() as pilot:
         await pilot.app.show("cleanup")
+        await pilot.pause()
         await pilot.pause()
         view = pilot.app.query_one(CleanupView)
         view._mode = "large"
@@ -183,6 +235,7 @@ async def test_cleanup_duplicates_premark():
     async with _make_app().run_test() as pilot:
         await pilot.app.show("cleanup")
         await pilot.pause()
+        await pilot.pause()
         view = pilot.app.query_one(CleanupView)
         view._mode = "duplicates"
         view._populate(rows, premark=True)  # redundant copies pre-marked
@@ -198,6 +251,7 @@ async def test_startup_view_populates():
     async with _make_app().run_test() as pilot:
         await pilot.app.show("startup")
         await pilot.pause()
+        await pilot.pause()
         view = pilot.app.query_one(StartupView)
         view._populate(entries)
         await pilot.pause()
@@ -212,6 +266,7 @@ async def test_services_view_populates():
     ]
     async with _make_app().run_test() as pilot:
         await pilot.app.show("services")
+        await pilot.pause()
         await pilot.pause()
         view = pilot.app.query_one(ServicesView)
         view._populate(items)
@@ -267,6 +322,7 @@ async def test_junk_clean_opens_confirm_in_worker():
     cats = [CategoryScan(JunkCategory("user-temp", "User temp", "", []), 600, 3, [])]
     async with _make_app().run_test() as pilot:
         await pilot.app.show("junk")
+        await pilot.pause()
         await pilot.pause()
         view = pilot.app.query_one(JunkView)
         view._populate(cats)  # the size>0 category is selected by default

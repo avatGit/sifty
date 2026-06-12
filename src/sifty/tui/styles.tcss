@@ -63,6 +63,34 @@ Screen {
     padding-top: 1;
 }
 
+/* ---- Tabbed group screens (Clean, Apps) ---- */
+#group-tabs {
+    height: auto;
+}
+
+#group-tabs Tabs {
+    background: $surface;
+}
+
+#group-tabs Tab {
+    color: $text-muted;
+}
+
+#group-tabs Tab.-active {
+    color: $accent;
+    text-style: bold;
+}
+
+#group-tabs Underline > .underline--bar {
+    color: $primary;
+}
+
+/* Each pane wraps a full sub-view; let its content size to fit and scroll. */
+#group-tabs TabPane {
+    height: auto;
+    padding: 1 1 0 1;
+}
+
 /* ---- Cards / panels ---- */
 .panel {
     border: round $primary;

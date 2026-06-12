@@ -41,18 +41,15 @@ SIFTY_THEME = Theme(
 
 # (nav key, sidebar label) — order defines the menu. No emoji: legacy consoles
 # render them as tofu boxes; Windows Terminal users still get a clean look.
+# "Clean" and "Apps" are tabbed groups (see views/group.py) that fold in the
+# former Junk/Purge/Optimize/Cleanup and Startup/Services screens.
 SECTIONS: list[tuple[str, str]] = [
     ("home", "Home"),
-    ("monitor", "Monitor"),
-    ("junk", "Junk"),
-    ("purge", "Purge"),
-    ("optimize", "Optimize"),
-    ("cleanup", "Cleanup"),
+    ("clean", "Clean"),
     ("disk", "Disk"),
     ("apps", "Apps"),
-    ("startup", "Startup"),
-    ("services", "Services"),
     ("updates", "Updates"),
+    ("monitor", "Monitor"),
     ("reports", "Reports"),
     ("ai", "AI"),
 ]
@@ -119,10 +116,19 @@ class SiftyApp(App):
             )
 
     async def show(self, key: str) -> None:
+        # A sub-view key (e.g. "junk", "startup") deep-links into its group's
+        # tab; a top-level key maps straight to its view class.
+        from .views import SUBVIEW_ROUTES, TabGroupView
+
+        group_key, tab_id = SUBVIEW_ROUTES.get(key, (key, None))
+        view_cls = VIEWS.get(group_key)
+        if view_cls is None:
+            return
         content = self.query_one("#content", VerticalScroll)
         await content.remove_children()
-        view_cls = VIEWS.get(key)
-        if view_cls is not None:
+        if issubclass(view_cls, TabGroupView):
+            await content.mount(view_cls(initial_tab=tab_id))
+        else:
             await content.mount(view_cls())
 
 
