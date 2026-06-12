@@ -64,4 +64,22 @@ def _run(path: Path, scheme: str, *, apply: bool, yes: bool) -> None:
         return
 
     done = organize.apply_moves(moves)
-    success(f"Organized {done} files.")
+    success(f"Organized {done} files. Undo with [cyan]sifty organize undo[/cyan].")
+
+
+@app.command("undo")
+def undo_cmd(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+) -> None:
+    """Move the files from the last 'organize apply' back where they were."""
+    pairs = organize.last_session()
+    if not pairs:
+        warn("Nothing to undo — no organize session recorded.")
+        return
+    if not confirm(f"Move {len(pairs)} file(s) back to their original locations?", assume_yes=yes):
+        warn("Cancelled.")
+        return
+    restored, failed = organize.undo_last()
+    success(f"Restored {restored} file(s).")
+    if failed:
+        warn(f"{failed} file(s) could not be restored (moved or replaced since).")
