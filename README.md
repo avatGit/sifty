@@ -53,12 +53,15 @@ accumulate (build artifacts, orphaned worktrees, bloated WSL2 disks).
 ## Install
 
 ```powershell
-# from source (recommended while pre-PyPI)
-git clone https://github.com/Vortrix5/sifty && cd sifty
-pipx install --editable .      # or: pip install .
+pipx install sifty       # recommended (isolated); or: pip install sifty
+scoop bucket add sifty https://github.com/Vortrix5/scoop-bucket; scoop install sifty
+winget install Vortrix5.Sifty            # once the winget-pkgs PR is merged
 
-sifty doctor                   # check admin rights, winget, Ollama
+sifty doctor             # check admin rights, winget, Ollama
 ```
+
+Prefer no Python install? Download the standalone `sifty.exe` from the
+[latest release](https://github.com/Vortrix5/sifty/releases/latest).
 
 For development:
 
@@ -158,19 +161,20 @@ space reclaimed over time with an **Undo last clean** button.
 2. Pull the configured model: `ollama pull qwen2.5:3b`.
 3. `sifty ai status` should report "running".
 
-Configure in `%APPDATA%\sifty\config.toml`:
+Configure everything with the `sifty config` command — no need to hand-edit
+files:
 
-```toml
-[ai]
-host = "http://localhost:11434"
-model = "qwen2.5:3b"
-
-[safety]
-extra_protected_paths = ["D:\\Important"]
-
-[junk]
-include_downloads_installers = false
+```powershell
+sifty config                                  # show all settings + your overrides
+sifty config set ai.model "llama3.2:3b"       # use a different local model
+sifty config set ai.host "http://localhost:11434"
+sifty config set safety.extra_protected_paths '["D:\\Important"]'
+sifty config set junk.include_downloads_installers true
+sifty config edit                             # or open config.toml in your editor
 ```
+
+Settings live in `%APPDATA%\sifty\config.toml`; `sifty config set` only writes
+the keys you change, so defaults keep flowing through on upgrades.
 
 ## Architecture
 
