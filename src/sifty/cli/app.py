@@ -34,7 +34,7 @@ from .commands import (
 
 app = typer.Typer(
     name="sifty",
-    help="Sifty — AI-assisted Windows maintenance: junk, disk, apps, updates, files.",
+    help="Windows maintenance from the terminal: junk, disk, apps, updates, files.",
     no_args_is_help=True,
     add_completion=True,
 )
@@ -69,20 +69,20 @@ def main(
         False, "--json", help="Emit machine-readable JSON (read-only commands).",
     ),
 ) -> None:
-    """Sifty — AI-assisted Windows maintenance."""
+    """Windows maintenance from the terminal."""
     setup_logging(verbose)
     output.set_json(json_output)
     # Auto-enable JSON when stdout is a real pipe. Use os.isatty(fileno()) rather
     # than sys.stdout.isatty() so that test runners (which swap sys.stdout for a
     # BytesIO/StringIO with no file descriptor) raise UnsupportedOperation and we
-    # leave JSON mode off — only a real piped fd triggers it.
+    # leave JSON mode off - only a real piped fd triggers it.
     if not json_output:
         import io
         try:
             if not os.isatty(sys.stdout.fileno()):
                 output.set_json(True)
         except (AttributeError, io.UnsupportedOperation, ValueError):
-            pass  # not a real file descriptor — leave JSON mode off
+            pass  # not a real file descriptor - leave JSON mode off
     get_logger("sifty.cli").debug("invoked: %s", " ".join(sys.argv[1:]))
     if admin and not is_admin():
         if relaunch_as_admin():
@@ -280,12 +280,12 @@ def doctor_cmd() -> None:
     if disk_free_gb < 0:
         disk_str = "[yellow]unknown[/yellow]"
     elif disk_free_gb < 10:
-        disk_str = f"[red]{disk_free_gb:.1f} GB free — low![/red]"
+        disk_str = f"[red]{disk_free_gb:.1f} GB free - low![/red]"
     else:
         disk_str = f"[green]{disk_free_gb:.1f} GB free[/green]"
     console.print(f"System disk ({sys_root}): {disk_str}")
 
-    console.print(f"Pending reboot:   {'[yellow]yes — restart recommended[/yellow]' if pending_reboot else '[green]no[/green]'}")
+    console.print(f"Pending reboot:   {'[yellow]yes - restart recommended[/yellow]' if pending_reboot else '[green]no[/green]'}")
     console.print(f"Audit log:        {'[green]writable[/green]' if audit_ok else '[red]not writable[/red]'} [dim]({audit})[/dim]")
 
     if ollama_up:
@@ -335,9 +335,9 @@ def checkup_cmd() -> None:
     console.print(table)
     issues = sum(1 for f in findings if f.severity != "ok")
     if issues:
-        console.print(f"[bold]{issues}[/bold] item(s) worth a look — checkup never changes anything itself.")
+        console.print(f"[bold]{issues}[/bold] item(s) worth a look - checkup never changes anything itself.")
     else:
-        success("All clear — nothing needs attention.")
+        success("All clear - nothing needs attention.")
 
 
 @app.command("logs")
@@ -351,7 +351,7 @@ def logs_cmd(
         console.print(str(path))
         return
     if not path.exists():
-        console.print("No log file yet — nothing has been logged.")
+        console.print("No log file yet - nothing has been logged.")
         return
     console.print(f"[dim]{path}[/dim]\n")
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -374,14 +374,14 @@ def clean_cmd(
 
     preview = core_junk.clean(only=only, dry_run=True)
     if preview.items == 0:
-        success("Nothing to clean — already tidy.")
+        success("Nothing to clean - already tidy.")
         return
     console.print(
         f"Profile [bold]{profile_name}[/bold]: {preview.items:,} items "
         f"({human_size(preview.bytes_freed)})."
     )
     if not apply:
-        console.print("[dim]Dry-run — re-run with --apply to remove.[/dim]")
+        console.print("[dim]Dry-run - re-run with --apply to remove.[/dim]")
         return
     if not confirm(f"Move {preview.items:,} items ({human_size(preview.bytes_freed)}) to the Recycle Bin?", assume_yes=yes):
         warn("Cancelled.")
@@ -419,7 +419,7 @@ def history_cmd(
         f"reclaimed · [bold]{summ['items']:,}[/bold] items\n"
     )
     if not runs:
-        console.print("No history yet — run [cyan]sifty junk clean --apply[/cyan] first.")
+        console.print("No history yet - run [cyan]sifty junk clean --apply[/cyan] first.")
         return
     table = Table(title="Recent runs")
     table.add_column("When (UTC)", style="dim")
@@ -430,7 +430,7 @@ def history_cmd(
     table.add_column("Restorable", justify="right")
     for r in runs:
         table.add_row(r.ts, r.action, r.detail, f"{r.items:,}",
-                      human_size(r.bytes_freed), str(r.restorable) if r.restorable else "—")
+                      human_size(r.bytes_freed), str(r.restorable) if r.restorable else "-")
     console.print(table)
 
 
@@ -441,7 +441,7 @@ def undo_cmd(
     """Restore the items from the most recent clean (from the Recycle Bin)."""
     run = undo.last_undoable()
     if run is None:
-        console.print("Nothing to undo — no restorable items in history.")
+        console.print("Nothing to undo - no restorable items in history.")
         return
     if not confirm(
         f"Restore {run.restorable} item(s) from the {run.action} clean at {run.ts}?",
