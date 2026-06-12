@@ -1,4 +1,4 @@
-"""Startup screen: list startup programs; click a row to enable/disable it."""
+"""Startup screen: highlight a program, then Enable/Disable it (reversible)."""
 
 from __future__ import annotations
 
@@ -19,13 +19,15 @@ class StartupView(BaseView):
     def compose(self) -> ComposeResult:
         yield Static("Startup programs", classes="title")
         yield Static(
-            "Click a row to enable/disable it (reversible). HKLM entries need "
-            "administrator rights — press F2 to elevate.",
+            "Highlight a row, then Enable/Disable (reversible — disabled entries "
+            "stay in the list). HKLM entries need administrator rights (F2).",
             classes="subtle",
         )
         yield DataTable(id="startup-table")
         with Horizontal(classes="actions"):
             yield Button("Refresh", id="refresh")
+            yield Button("Enable", id="enable")
+            yield Button("Disable", id="disable", variant="warning")
         yield Static("", id="startup-status", classes="status")
 
     def on_mount(self) -> None:
@@ -47,33 +49,45 @@ class StartupView(BaseView):
         self.app.call_from_thread(self._populate, entries)
 
     def _populate(self, entries) -> None:
-        self._entries = entries
+        # Stable name sort so a row stays put after Enable/Disable + reload.
+        self._entries = sorted(entries, key=lambda e: e.name.lower())
         table = self.query_one("#startup-table", DataTable)
         table.clear()
-        for i, e in enumerate(entries):
+        for i, e in enumerate(self._entries):
             state = "[green]enabled[/green]" if e.enabled else "[yellow]disabled[/yellow]"
             table.add_row(e.name, state, e.location, e.command, key=str(i))
-        enabled = sum(1 for e in entries if e.enabled)
-        self._status(f"{len(entries)} entries · {enabled} enabled")
+        enabled = sum(1 for e in self._entries if e.enabled)
+        disabled = len(self._entries) - enabled
+        self._status(f"{len(self._entries)} programs · {enabled} enabled · {disabled} disabled")
 
     def _status(self, msg: str) -> None:
         self.query_one("#startup-status", Static).update(msg)
 
+    def _highlighted(self):
+        table = self.query_one("#startup-table", DataTable)
+        if table.row_count == 0:
+            return None
+        idx = table.cursor_row
+        if idx is not None and 0 <= idx < len(self._entries):
+            return self._entries[idx]
+        return None
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "refresh":
             self.load()
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        if event.row_key is None or event.row_key.value is None:
-            return
-        idx = int(event.row_key.value)
-        if 0 <= idx < len(self._entries):
-            self.toggle(idx)
+        elif event.button.id in ("enable", "disable"):
+            entry = self._highlighted()
+            if entry is None:
+                self._status("No program selected.")
+                return
+            want_enabled = event.button.id == "enable"
+            if entry.enabled == want_enabled:
+                self._status(f"'{entry.name}' is already {'enabled' if want_enabled else 'disabled'}.")
+                return
+            self.toggle(entry, want_enabled)
 
     @work(thread=True, exclusive=True)
-    def toggle(self, idx: int) -> None:
-        entry = self._entries[idx]
-        want_enabled = not entry.enabled
+    def toggle(self, entry, want_enabled: bool) -> None:
         ok = startup.enable(entry) if want_enabled else startup.disable(entry)
         self.app.call_from_thread(self._after_toggle, entry.name, want_enabled, ok)
 

@@ -295,7 +295,7 @@ async def test_cleanup_duplicates_premark():
         assert view._marked == {str(rows[0][0])}
 
 
-async def test_startup_view_populates():
+async def test_startup_view_populates_with_buttons_and_no_click_toggle():
     entries = [
         StartupEntry("Spotify", "C:/spotify.exe", "HKCU Run", enabled=True, kind="hkcu-run"),
         StartupEntry("OldThing", "C:/old.exe", "HKCU Run (disabled)", enabled=False, kind="hkcu-run"),
@@ -308,7 +308,31 @@ async def test_startup_view_populates():
         view._populate(entries)
         await pilot.pause()
         table = pilot.app.query_one("#startup-table", DataTable)
-        assert table.row_count == 2
+        assert table.row_count == 2  # disabled entries are listed too
+        # Explicit Enable/Disable buttons exist (Services pattern)…
+        assert pilot.app.screen.query_one("#enable", Button)
+        assert pilot.app.screen.query_one("#disable", Button)
+        # …and selecting a row must NOT toggle it (the old instant-toggle bug).
+        assert not hasattr(view, "on_data_table_row_selected")
+
+
+async def test_startup_buttons_skip_noop_state_change():
+    entries = [
+        StartupEntry("Spotify", "C:/spotify.exe", "HKCU Run", enabled=True, kind="hkcu-run"),
+    ]
+    async with _make_app().run_test() as pilot:
+        await pilot.app.show("startup")
+        await pilot.pause()
+        await pilot.pause()
+        view = pilot.app.query_one(StartupView)
+        view._populate(entries)
+        await pilot.pause()
+        # "Enable" on an already-enabled entry is a no-op with a status message,
+        # not a registry write.
+        await pilot.click("#enable")
+        await pilot.pause()
+        status = pilot.app.screen.query_one("#startup-status", Static)
+        assert "already enabled" in str(status.render())
 
 
 async def test_services_view_populates():

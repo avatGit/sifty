@@ -110,6 +110,8 @@ class JunkView(BaseView):
     @work(thread=True, exclusive=True)
     def apply_clean(self, keys: set[str]) -> None:
         result = junk.clean(only=keys, dry_run=False)
+        for reason in result.skipped:
+            logger.warning("junk clean skipped: %s", reason)
         history.record_clean(
             "junk", ",".join(sorted(keys)),
             result.bytes_freed, result.items, result.trashed,
@@ -119,8 +121,21 @@ class JunkView(BaseView):
         )
 
     def _after_clean(self, freed: int, items: int, skipped: int) -> None:
+        msg = f"Sent {items:,} items ({human_size(freed)}) to the Recycle Bin."
+        if skipped:
+            # Be honest about what stayed behind — otherwise a re-clean where
+            # everything is locked looks like the button "does nothing".
+            reason = (
+                "need administrator rights (F2) or are in use"
+                if not is_admin() else "are in use by running apps"
+            )
+            msg += f"\n{skipped:,} item(s) skipped — they {reason}."
         self.app.notify(
-            f"Sent {items:,} items ({human_size(freed)}) to the Recycle Bin.",
+            msg,
             title="Junk cleaned",
+            severity="warning" if skipped and not items else "information",
+            timeout=8 if skipped else 5,
         )
+        if skipped:
+            self._set_status(f"{skipped:,} item(s) could not be removed — see `sifty logs`.")
         self.load()
