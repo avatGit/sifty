@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from sifty.core import registry_scan
-from sifty.core.registry_scan import OrphanEntry, find_orphan_uninstall_entries
+from sifty.core.registry_scan import find_orphan_uninstall_entries
 
 
 def _make_registry(apps: dict[str, dict[str, str]]):

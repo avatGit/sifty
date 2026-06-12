@@ -81,7 +81,6 @@ def find_orphan_worktrees(root: Path) -> list[OrphanWorktree]:
     if not entries:
         return []
 
-    main_path = entries[0].get("path")
     orphans: list[OrphanWorktree] = []
 
     for entry in entries[1:]:   # skip main worktree

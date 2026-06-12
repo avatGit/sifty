@@ -56,7 +56,7 @@ def compact_vhdx(path: Path) -> tuple[bool, str]:
             timeout=300,
         )
         ok = result.returncode == 0
-        lines = [l.strip() for l in (result.stdout + result.stderr).splitlines() if l.strip()]
+        lines = [line.strip() for line in (result.stdout + result.stderr).splitlines() if line.strip()]
         msg = lines[-1] if lines else ("ok" if ok else f"exit {result.returncode}")
         return ok, msg
     except FileNotFoundError:

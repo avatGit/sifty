@@ -14,10 +14,10 @@ from .apps import AppsView
 from .cleanup import CleanupView
 from .disk import DiskView
 from .group import (
-    AppsSystemView,
-    CleanView,
     SUBVIEW_LABELS,
     SUBVIEW_ROUTES,
+    AppsSystemView,
+    CleanView,
     TabGroupView,
 )
 from .home import HomeView

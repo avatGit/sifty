@@ -108,7 +108,7 @@ def run_op(op: OptimizeOp, *, dry_run: bool = True) -> tuple[bool, str]:
         )
 
     if op.key == "compact-vhd":
-        from ..windows.hyperv import list_vhdx_files, compact_vhdx
+        from ..windows.hyperv import compact_vhdx, list_vhdx_files
         vhds = list_vhdx_files()
         if not vhds:
             return True, "no .vhdx files found"
@@ -136,8 +136,8 @@ def _clean_output(raw: str) -> str:
     version/header lines so the TUI and CLI show a single readable result.
     """
     lines = [
-        l.strip() for l in raw.splitlines()
-        if l.strip() and not _PROGRESS_BAR.match(l.strip())
+        line.strip() for line in raw.splitlines()
+        if line.strip() and not _PROGRESS_BAR.match(line.strip())
     ]
     return lines[-1] if lines else ""
 

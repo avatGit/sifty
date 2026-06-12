@@ -15,7 +15,10 @@ import sifty.core.updates as updates_mod
 from sifty.ai import tools
 from sifty.ai.tools import ToolResult
 from sifty.core.models import (
-    CategoryScan, InstalledApp, JunkCategory, Upgrade,
+    CategoryScan,
+    InstalledApp,
+    JunkCategory,
+    Upgrade,
 )
 
 

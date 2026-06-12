@@ -100,7 +100,7 @@ def find_duplicates(
         hashes = list(pool.map(_hash_file, candidates))
 
     dupes: dict[str, list[Path]] = defaultdict(list)
-    for fp, digest in zip(candidates, hashes):
+    for fp, digest in zip(candidates, hashes, strict=True):
         if digest:
             dupes[digest].append(fp)
     return {d: ps for d, ps in dupes.items() if len(ps) > 1}

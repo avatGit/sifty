@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from sifty.core import startup
-from sifty.core.models import StartupEntry
 from sifty.windows import registry
 
 

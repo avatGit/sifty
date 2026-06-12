@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
-from sifty.core import purge, safety
+from sifty.core import purge
 
 
 def _make_tree(root: Path, structure: dict) -> None:

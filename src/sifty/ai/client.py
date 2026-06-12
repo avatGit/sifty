@@ -35,7 +35,7 @@ class OllamaClient:
     keep_alive: str = "10m"
 
     @classmethod
-    def from_config(cls, config=None) -> "OllamaClient":
+    def from_config(cls, config=None) -> OllamaClient:
         config = config or load_config()
         ai = config.section("ai")
         return cls(

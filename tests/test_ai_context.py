@@ -7,11 +7,10 @@ import json
 import httpx
 import pytest
 
-from sifty.ai.client import OllamaClient, OllamaUnavailable
 from sifty.ai import context as ai_context
+from sifty.ai.client import OllamaClient
 from sifty.core import disk, history
 from sifty.core.models import VolumeUsage
-
 
 # ---------------------------------------------------------------------------
 # context.build()
@@ -64,7 +63,7 @@ def _fake_chunks(texts: list[str]) -> bytes:
     """Build a fake Ollama streaming response body."""
     lines = [json.dumps({"message": {"content": t}, "done": False}) for t in texts]
     lines.append(json.dumps({"done": True}))
-    return b"\n".join(l.encode() for l in lines)
+    return b"\n".join(line.encode() for line in lines)
 
 
 def _mock_client(monkeypatch) -> OllamaClient:

@@ -13,33 +13,28 @@ from textual.widgets import Button, DataTable, Input, Select, SelectionList, Sta
 
 from sifty.core.apps import InstalledApp
 from sifty.core.junk import CategoryScan, JunkCategory
-from sifty.core.models import Run
+from sifty.core.models import Run, ServiceInfo, StartupEntry
 from sifty.core.updates import Upgrade
 from sifty.tui.app import SECTIONS, SiftyApp
 from sifty.tui.commands import SiftyCommands, _entries
 from sifty.tui.modals import ConfirmModal
-from sifty.core.models import StartupEntry
 from sifty.tui.views import (
+    SUBVIEW_LABELS,
+    VIEWS,
     AIView,
-    AppsSystemView,
     AppsView,
     CleanupView,
     CleanView,
     DiskView,
     HomeView,
     JunkView,
-    MonitorView,
     OptimizeView,
     PurgeView,
     ReportsView,
     ServicesView,
     StartupView,
-    SUBVIEW_LABELS,
-    SUBVIEW_ROUTES,
     UpdatesView,
-    VIEWS,
 )
-from sifty.core.models import ServiceInfo
 
 
 def _make_app() -> SiftyApp:
@@ -349,7 +344,6 @@ async def test_reports_view_populates():
 
 
 async def test_disk_view_buttons_are_on_screen():
-    from textual.widgets import Button
 
     async with _make_app().run_test(size=(120, 40)) as pilot:
         await pilot.app.show("disk")

@@ -18,12 +18,11 @@ The autonomy level decides which tiers need a confirm (see :mod:`sifty.ai.agent`
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 from ..console import human_size
-
 
 # ---------------------------------------------------------------------------
 # Tool result + Tool dataclasses
@@ -48,7 +47,7 @@ class Tool:
     description: str
     parameters: dict          # JSON Schema for the function's arguments
     risk: str                 # "read" | "low" | "high"
-    handler: Callable[[dict], "ToolResult | str"]
+    handler: Callable[[dict], ToolResult | str]
 
     def to_ollama(self) -> dict:
         """Return the Ollama tool-descriptor for this tool."""

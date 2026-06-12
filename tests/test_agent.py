@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from sifty.ai import agent as ai_agent, tools as ai_tools
+from sifty.ai import tools as ai_tools
 from sifty.ai.agent import (
     FallbackEvent,
     FinalAnswerEvent,
@@ -17,7 +15,6 @@ from sifty.ai.agent import (
 )
 from sifty.ai.client import OllamaClient, OllamaUnavailable
 from sifty.ai.tools import Tool, ToolResult
-
 
 # ---------------------------------------------------------------------------
 # Autonomy gating

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from textual.widgets import Button, Input
 
 from sifty.tui import state

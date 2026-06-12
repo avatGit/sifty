@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from ...console import console, error, human_size, success, warn
+from ...console import error, human_size, success, warn
 from ...core import schedule, watch
 from ...windows import notify, scheduler
 from .. import output

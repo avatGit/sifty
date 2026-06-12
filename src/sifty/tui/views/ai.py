@@ -36,8 +36,10 @@ from ...ai.agent import (
     ToolCallEvent,
     ToolResultEvent,
     current_autonomy,
-    run as agent_run,
     set_autonomy,
+)
+from ...ai.agent import (
+    run as agent_run,
 )
 from ...ai.client import OllamaClient, OllamaUnavailable
 from ...ai.tools import TOOLS as ALL_TOOLS

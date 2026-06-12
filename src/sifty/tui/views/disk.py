@@ -10,8 +10,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Input, Static, Tree
 
-from ...core import disk
 from ...console import human_size
+from ...core import disk
 from .. import state
 from ..screens.path_picker import PathPicker
 from ..widgets import Panel

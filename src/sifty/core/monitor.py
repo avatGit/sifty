@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 import psutil
 
 
-
 @dataclass
 class ProcInfo:
     pid: int

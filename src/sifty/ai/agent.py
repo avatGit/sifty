@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Callable, Iterator
 
 from ..infra.config import app_data_dir, load_config
 from .client import OllamaClient, OllamaUnavailable

@@ -15,8 +15,20 @@ from ..infra.logging import get_logger, log_file, setup_logging
 from ..windows.admin import is_admin, relaunch_as_admin
 from . import output
 from .commands import (
-    ai_group, apps, cleanup, disk, junk, optimize, organize, profile, purge,
-    schedule, services, startup, updates, watch,
+    ai_group,
+    apps,
+    cleanup,
+    disk,
+    junk,
+    optimize,
+    organize,
+    profile,
+    purge,
+    schedule,
+    services,
+    startup,
+    updates,
+    watch,
 )
 
 app = typer.Typer(
@@ -454,7 +466,7 @@ def entrypoint() -> None:
     except Exception:
         get_logger("sifty.cli").exception("Fatal error")
         error(f"Sifty hit an unexpected error. Details written to {log_file()}")
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

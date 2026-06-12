@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import subprocess
-from importlib.metadata import PackageNotFoundError, version as pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 
 __all__ = ["current_version", "latest_version", "check_update", "apply_update"]
 

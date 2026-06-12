@@ -22,9 +22,9 @@ Send2Trash — there is no permanent ``os.remove``/``rmtree`` anywhere in the ap
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from ..infra.config import audit_log_path
 from ..windows.recyclebin import send_to_trash
@@ -146,7 +146,7 @@ def trash(
 
 def audit(message: str) -> None:
     """Append a timestamped line to the audit log."""
-    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    stamp = datetime.now(UTC).isoformat(timespec="seconds")
     line = f"{stamp} {message}\n"
     with audit_log_path().open("a", encoding="utf-8") as fh:
         fh.write(line)
