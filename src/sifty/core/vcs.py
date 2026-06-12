@@ -115,20 +115,27 @@ def prune_worktrees(
     *,
     dry_run: bool = True,
     config=None,
+    only: list[Path] | None = None,
 ) -> CleanResult:
     """Prune orphaned worktree registrations and trash the on-disk directories.
 
-    Calls ``git worktree prune`` first (removes stale metadata), then trashes
-    any on-disk directories that were identified as orphans.
+    ``only`` restricts action to the given worktree paths (e.g. the user's
+    selection in the TUI); ``None`` means every orphan. Trashes the on-disk
+    directories first, then runs ``git worktree prune`` so the newly-missing
+    directories are also deregistered (metadata-only).
     """
     orphans = find_orphan_worktrees(root)
+    if only is not None:
+        wanted = {str(p) for p in only}
+        orphans = [o for o in orphans if str(o.path) in wanted]
     if not orphans:
         return CleanResult(0, 0, [], [])
 
-    if not dry_run:
-        _run_git(["worktree", "prune"], root)
-
+    from ..infra.config import load_config
     from .junk import _dir_size as _ds
+
+    config = config or load_config()
+    extra_protected = config.section("safety").get("extra_protected_paths", [])
 
     bytes_freed = 0
     items = 0
@@ -141,7 +148,7 @@ def prune_worktrees(
             continue
         try:
             size, _ = _ds(ow.path)
-            trash(ow.path, dry_run=dry_run, config=config)
+            trash(ow.path, extra_protected=extra_protected, dry_run=dry_run)
             bytes_freed += size
             items += 1
             if not dry_run:
@@ -150,5 +157,8 @@ def prune_worktrees(
             skipped.append(str(exc))
         except OSError as exc:
             skipped.append(f"{ow.path}: {exc}")
+
+    if not dry_run:
+        _run_git(["worktree", "prune"], root)
 
     return CleanResult(bytes_freed, items, skipped, trashed)

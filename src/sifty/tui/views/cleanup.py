@@ -180,7 +180,7 @@ class CleanupView(BaseView):
     @work(thread=True, exclusive=True)
     def do_clean(self, paths: list[Path]) -> None:
         if self._mode == "worktrees":
-            result = prune_worktrees(self._path(), dry_run=False)
+            result = prune_worktrees(self._path(), dry_run=False, only=paths)
         else:
             result = cleanup.trash_paths(paths, dry_run=False)
         history.record_clean(
