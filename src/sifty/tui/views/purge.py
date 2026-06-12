@@ -11,8 +11,10 @@ from textual.containers import Horizontal
 from textual.widgets import Button, DataTable, Input, Static
 
 from ...console import human_size
-from ...core import history, purge
+from ...core import disk, history, purge
+from .. import state
 from ..modals import ConfirmModal
+from ..screens.path_picker import PathPicker
 from ..widgets import Panel
 from .base import BaseView
 
@@ -34,6 +36,7 @@ class PurgeView(BaseView):
         )
         yield Input(value=str(Path.home()), id="purge-path", placeholder="Project root to scan")
         with Horizontal(classes="actions"):
+            yield Button("Browse…", id="browse")
             yield Button("Scan", id="scan", variant="primary")
         yield Panel(DataTable(id="purge-table"), title="Artifact directories", id="purge-panel")
         with Horizontal(classes="actions", id="purge-actions"):
@@ -59,7 +62,9 @@ class PurgeView(BaseView):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
-        if bid == "scan":
+        if bid == "browse":
+            self._browse()
+        elif bid == "scan":
             self._status(f"Scanning {self._path()}…")
             self.query_one("#purge-panel").display = True
             self.query_one("#purge-actions").display = False
@@ -73,6 +78,18 @@ class PurgeView(BaseView):
             self._rebuild_table()
         elif bid == "purge":
             self._purge_flow()
+
+    @work
+    async def _browse(self) -> None:
+        # Worker context required for push_screen_wait.
+        drives = [v.mountpoint for v in disk.volumes()]
+        picked = await self.app.push_screen_wait(
+            PathPicker(self._path(), state.recent_paths(), drives=drives)
+        )
+        if picked is None:
+            return
+        self.query_one("#purge-path", Input).value = str(picked)
+        state.add_recent_path(str(picked))
 
     @work(thread=True, exclusive=True, group="purge-scan")
     def scan(self) -> None:
