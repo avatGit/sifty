@@ -9,6 +9,22 @@ Sifty ships two artifacts per release, both automated by
 2. **`sifty.exe`**, a standalone Windows executable attached to the GitHub
    Release (no Python needed to run it).
 
+## Version policy
+
+Sifty follows [Semantic Versioning](https://semver.org). Versions are
+`MAJOR.MINOR.PATCH`, tagged `vMAJOR.MINOR.PATCH`. Which part to bump:
+
+- **PATCH** (`0.6.0` → `0.6.1`): bug fixes, copy and docs, and safe internal
+  refactors. No new commands and no changed user-facing behavior.
+- **MINOR** (`0.6.x` → `0.7.0`): new capabilities (a command, a junk category,
+  a scanner) or changed user-facing behavior. This is what every release so far
+  has been.
+- **MAJOR** (`0.x` → `1.0.0`): the deliberate "Sifty is stable" milestone.
+
+Sifty is **pre-1.0**, so the CLI and behavior are still allowed to change in a
+minor bump; a breaking change does not force a major bump yet. After `1.0.0`,
+breaking changes to the CLI or behavior require a major bump.
+
 ## Cutting a release
 
 1. Bump the version in **two** places and update the changelog:
