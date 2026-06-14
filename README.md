@@ -7,6 +7,7 @@
 <p align="center"><em>Sift the junk from the keep.</em></p>
 
 <p align="center">
+  <a href="https://pypi.org/project/sifty/"><img src="https://img.shields.io/pypi/v/sifty" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
@@ -14,11 +15,23 @@
   <a href="https://codecov.io/gh/Vortrix5/sifty"><img src="https://codecov.io/gh/Vortrix5/sifty/branch/main/graph/badge.svg" alt="Coverage"></a>
 </p>
 
-Clean junk, analyze disks, find duplicates, manage apps and startup programs,
-apply updates, prune dev artifacts and git worktrees, and organize files, from
-a scriptable CLI or a full-screen terminal UI. The optional AI assistant runs
-**locally** via [Ollama]: nothing leaves your machine, and it only ever sees
-file *metadata* (names, sizes, paths), never file contents.
+<p align="center">
+  <a href="https://sifty.tech">Website</a> ·
+  <a href="https://sifty.tech/guides/">Guides</a> ·
+  <a href="https://github.com/Vortrix5/sifty/blob/main/CHANGELOG.md">Changelog</a>
+</p>
+
+**Sifty is an open-source maintenance tool for Windows that is built to be hard
+to misuse: it previews every change, deletes only to the Recycle Bin, and can
+undo any clean.** It clears junk and caches, analyzes disk usage, finds
+duplicate files, and manages apps, startup items and updates. It also cleans the
+clutter other cleaners ignore: stray `node_modules` and build output, orphaned
+git worktrees, and bloated WSL2 disks. Drive it from a scriptable CLI or a
+full-screen terminal UI.
+
+The optional AI assistant runs **locally** via [Ollama]: nothing leaves your
+machine, and it only ever sees file *metadata* (names, sizes, paths), never file
+contents.
 
 ![Sifty demo](docs/demo.gif)
 
