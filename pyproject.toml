@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Vortrix5/sifty"
+Homepage = "https://sifty.tech"
 Repository = "https://github.com/Vortrix5/sifty"
 Issues = "https://github.com/Vortrix5/sifty/issues"
 Changelog = "https://github.com/Vortrix5/sifty/blob/main/CHANGELOG.md"
