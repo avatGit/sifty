@@ -75,9 +75,19 @@ asyncio_mode = "auto"
 source = ["sifty"]
 branch = true
 relative_files = true
+omit = [
+    "src/sifty/__main__.py",   # 3-line `python -m sifty` trampoline → entrypoint
+]
 
 [tool.coverage.report]
 show_missing = true
+exclude_also = [
+    "pragma: no cover",                 # honoured the existing in-source tags
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "raise AssertionError",
+]
 
 [tool.ruff]
 line-length = 120
