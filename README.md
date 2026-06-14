@@ -11,6 +11,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4" alt="Windows">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
   <img src="https://github.com/Vortrix5/sifty/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://codecov.io/gh/Vortrix5/sifty"><img src="https://codecov.io/gh/Vortrix5/sifty/branch/main/graph/badge.svg" alt="Coverage"></a>
 </p>
 
 Clean junk, analyze disks, find duplicates, manage apps and startup programs,
