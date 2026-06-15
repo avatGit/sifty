@@ -54,7 +54,7 @@ Sifty deletes files and changes system state, so it is built to be hard to misus
 
 | Feature | Sifty | CCleaner | BleachBit | Revo Uninstaller | WinDirStat |
 | --- | --- | --- | --- | --- | --- |
-| Junk / cache cleaning | ✅ 11+ categories | ✅ | ✅ | ➖ | ❌ |
+| Junk / cache cleaning | ✅ 14+ categories | ✅ | ✅ | ➖ | ❌ |
 | Disk usage analysis | ✅ top-N + volumes | ➖ | ❌ | ❌ | ✅ treemap |
 | Duplicate finder | ✅ SHA-256, NTFS-aware | ✅ (paid) | ❌ | ❌ | ❌ |
 | App uninstall + leftover scan | ✅ winget + leftovers | ✅ | ❌ | ✅ + leftovers | ❌ |
@@ -75,6 +75,30 @@ accumulate (build artifacts, orphaned worktrees, bloated WSL2 disks).
 open-source cousin; it is cross-platform and can securely shred files, while
 Sifty stays Windows-only, sends everything to the Recycle Bin with full undo,
 and adds duplicates, app management and developer cleanups.
+
+### Cleaned Junk Categories
+
+When running `sifty junk scan` or `sifty junk clean`, the engine targets the following categories extracted directly from `junk_categories()`:
+
+#### Always-On Categories
+
+- **`user-temp`**: Per-user temporary files (`%TEMP%` or `%TMP%`).
+- **`thumbnail-cache`**: Explorer thumbnail and icon cache (rebuilt automatically).
+- **`browser-cache`**: On-disk caches for Chrome, Edge, Brave, Vivaldi, and Firefox profiles (never cookies, history, or passwords).
+- **`winget-cache`**: Temporary installer files downloaded by WinGet.
+- **`onedrive-logs`**: OneDrive sync diagnostic logs (rebuilt automatically).
+- **`discord-cache`**: On-disk caches for Discord, PTB, and Canary channels (never login session data).
+- **`crash-dumps`**: Per-user crash dumps and error reports (`CrashDumps`, `WER`).
+- **`windows-temp`** _(Requires Admin)_: System-wide temporary files (`C:\Windows\Temp`).
+- **`windows-update-cache`** _(Requires Admin)_: Downloaded update packages left behind by Windows Update.
+- **`event-log-archives`** _(Requires Admin)_: Old Windows event log archives (`Archive-*.evtx`). Active logs are untouched.
+- **`defender-history`** _(Requires Admin)_: Windows Defender scan detection history logs.
+- **`system-crash-reports`** _(Requires Admin)_: System-wide crash reports and kernel minidumps (`WER`, `Minidump`).
+
+#### Off by Default (Opt-in via configuration)
+
+- **`downloads-installers`**: Installer files (`.exe`/`.msi`) in your Downloads folder. Can be enabled via `sifty config set junk.include_downloads_installers true`.
+- **`windows-old`** _(Requires Admin)_: Leftovers from previous Windows installations after a feature update (`C:\Windows.old`). Can be enabled via `sifty config set junk.include_windows_old true`.
 
 ## Install
 
