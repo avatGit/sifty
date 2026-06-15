@@ -72,6 +72,30 @@ def _browser_cache_roots(local: Path) -> list[Path]:
 
     return roots
 
+def _discord_cache_roots() -> list[Path]:
+    """Cache directories for Discord, Discord PTB, and Discord Canary.
+
+    Only returns specific Chromium cache paths - never login session,
+    local storage, or settings data.
+    """
+    roots: list[Path] = []
+    appdata = _env_path("APPDATA")
+    if not appdata:
+        return roots
+
+    flavors = ["discord", "discordptb", "discordcanary"]
+    cache_subs = ["Cache", "Code Cache", "GPUCache"]
+
+    for flavor in flavors:
+        flavor_dir = appdata / flavor
+        if not flavor_dir.is_dir():
+            continue
+        for sub in cache_subs:
+            cand = flavor_dir / sub
+            if cand.is_dir():
+                roots.append(cand)
+
+    return roots
 
 def junk_categories(config=None) -> list[JunkCategory]:
     """Build the list of junk categories from the environment + config."""
@@ -189,6 +213,17 @@ def junk_categories(config=None) -> list[JunkCategory]:
             JunkCategory(
                 "onedrive-logs", "OneDrive sync logs",
                 "OneDrive diagnostic logs (rebuilt automatically).", [od_logs],
+            )
+        )
+
+    # Discord caches (Chromium style, safe to clear)
+    discord_roots = _discord_cache_roots()
+    if discord_roots:
+        cats.append(
+            JunkCategory(
+                "discord-cache", "Discord cache",
+                "On-disk caches for Discord, PTB, and Canary channels (never login session data).",
+                discord_roots,
             )
         )
 
