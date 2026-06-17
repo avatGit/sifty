@@ -113,6 +113,9 @@ sifty doctor             # check admin rights, winget, Ollama
 Prefer no Python install? Download the standalone `sifty.exe` from the
 [latest release](https://github.com/Vortrix5/sifty/releases/latest).
 
+Free Windows code signing provided by [SignPath.io](https://about.signpath.io/),
+certificate by [SignPath Foundation](https://signpath.org/).
+
 For development:
 
 ```powershell
