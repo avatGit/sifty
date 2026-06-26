@@ -138,3 +138,28 @@ def test_discord_cache_category_covers_flavors_and_safeguards_session(monkeypatc
 
     # Verification 3: Crucial session paths are ignored
     assert not any("Local Storage" in r for r in roots)
+
+
+def test_installer_app_hint_strips_suffixes():
+    """Verify that installer filenames are properly cleaned into app hints."""
+    assert junk._installer_app_hint(Path("Discord-Setup-1.2.3.exe")) == "discord setup"
+    assert junk._installer_app_hint(Path("vscode_install_x64.msi")) == "vscode install"
+    assert junk._installer_app_hint(Path("Python-3.11.exe")) == "python"
+    assert junk._installer_app_hint(Path("BraveBrowser.exe")) == "bravebrowser"
+
+
+def test_is_installed_app_installer_matches_substrings():
+    """Verify substring matching in both directions with a frozenset of installed apps."""
+    installed_apps = frozenset({"discord app", "vlc media player", "python"})
+
+    assert junk._is_installed_app_installer(Path("Discord.exe"), installed_apps) is True
+
+    assert junk._is_installed_app_installer(Path("Python-Setup.exe"), installed_apps) is True
+
+    assert junk._is_installed_app_installer(Path("chrome_installer.exe"), installed_apps) is False
+
+
+def test_is_installed_app_installer_under_3_chars_guard():
+    """Verify that hints under 3 characters are rejected immediately."""
+    installed_apps = frozenset({"go", "golang", "google chrome"})
+    assert junk._is_installed_app_installer(Path("go.exe"), installed_apps) is False
